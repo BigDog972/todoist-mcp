@@ -49,6 +49,8 @@ export const ApiLimits = {
     REMINDERS_DEFAULT: 50,
     /** Maximum limit for reminder search operations */
     REMINDERS_MAX: 200,
+    /** Maximum values in one list-valued filter parameter, such as labels or project IDs */
+    FILTER_VALUES_MAX: 50,
 } as const
 
 // UI Display Limits
@@ -69,6 +71,18 @@ export const LogLimits = {
 export const BatchLimits = {
     /** Maximum tasks accepted by one task create or update operation */
     TASKS_PER_OPERATION: 25,
+    /** Maximum projects, sections, comments, labels or filters created or updated by one call */
+    ITEMS_PER_OPERATION: 25,
+    /**
+     * Maximum existing objects one bulk action takes by ID, such as completing,
+     * rescheduling, reordering or assigning. A sync-backed reschedule sends one
+     * command per task, which keeps it under the Sync API's 100 commands per
+     * request. A reorder is not bounded that way: it can rekey every sibling of
+     * the objects it moves, so its command count depends on the sibling list.
+     */
+    BULK_ACTIONS_PER_OPERATION: 50,
+    /** Maximum labels set on one task by one call */
+    LABELS_PER_TASK: 50,
 } as const
 
 // Concurrency Limits
