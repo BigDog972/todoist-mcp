@@ -1,3 +1,13 @@
+## [16.1.0](https://github.com/todoist/todoist-mcp/compare/v16.0.0...v16.1.0) (2026-11-17)
+
+### Features
+
+* set and read a user status that has only an emoji ([#719](https://github.com/todoist/todoist-mcp/issues/719)) ([bd688ca](https://github.com/todoist/todoist-mcp/commit/bd688cabb37beb1900c1c412f6b6cdd8c7c99f5a))
+
+### Bug Fixes
+
+* tidy the host patterns on view-attachment and import-project-template ([#720](https://github.com/todoist/todoist-mcp/issues/720)) ([6317cd3](https://github.com/todoist/todoist-mcp/commit/6317cd3d81563657cb808ffb9bebe683b40c4909))
+
 ## [16.0.0](https://github.com/todoist/todoist-mcp/compare/v15.2.1...v16.0.0) (2026-11-17)
 
 ### ⚠ BREAKING CHANGES
