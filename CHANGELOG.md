@@ -1,3 +1,13 @@
+## [16.0.0](https://github.com/todoist/todoist-mcp/compare/v15.2.1...v16.0.0) (2026-11-17)
+
+### ⚠ BREAKING CHANGES
+
+* tighten tool input schemas from the Gemini connector review (#717)
+
+### Bug Fixes
+
+* tighten tool input schemas from the Gemini connector review ([#717](https://github.com/todoist/todoist-mcp/issues/717)) ([f12a58e](https://github.com/todoist/todoist-mcp/commit/f12a58eed2ea1caa88292cfb86c22b85a4434144))
+
 ## [15.2.1](https://github.com/todoist/todoist-mcp/compare/v15.2.0...v15.2.1) (2026-11-13)
 
 ### Bug Fixes
