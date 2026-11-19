@@ -1,3 +1,9 @@
+## [16.1.1](https://github.com/todoist/todoist-mcp/compare/v16.1.0...v16.1.1) (2026-11-19)
+
+### Bug Fixes
+
+* restore detailed project health reports ([#722](https://github.com/todoist/todoist-mcp/issues/722)) ([1023fdd](https://github.com/todoist/todoist-mcp/commit/1023fdd687dd3dea060ce6115d45f02de75683b4))
+
 ## [16.1.0](https://github.com/todoist/todoist-mcp/compare/v16.0.0...v16.1.0) (2026-11-17)
 
 ### Features
