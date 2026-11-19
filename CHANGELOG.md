@@ -1,3 +1,13 @@
+## [17.0.0](https://github.com/todoist/todoist-mcp/compare/v16.1.1...v17.0.0) (2026-11-19)
+
+### ⚠ BREAKING CHANGES
+
+* drop the rebuilt project health context (#723)
+
+### Bug Fixes
+
+* drop the rebuilt project health context ([#723](https://github.com/todoist/todoist-mcp/issues/723)) ([070999c](https://github.com/todoist/todoist-mcp/commit/070999cd065d4ae6036b22a6c9abefb5b3c8e21f))
+
 ## [16.1.1](https://github.com/todoist/todoist-mcp/compare/v16.1.0...v16.1.1) (2026-11-19)
 
 ### Bug Fixes
