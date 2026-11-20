@@ -1,3 +1,9 @@
+## [17.1.2](https://github.com/todoist/todoist-mcp/compare/v17.1.1...v17.1.2) (2026-11-20)
+
+### Bug Fixes
+
+* complete and reopen large batches of tasks concurrently ([#731](https://github.com/todoist/todoist-mcp/issues/731)) ([95c41ef](https://github.com/todoist/todoist-mcp/commit/95c41ef6a5af807106b2dd579c7e182395424bac)), closes [#721](https://github.com/todoist/todoist-mcp/issues/721)
+
 ## [17.1.1](https://github.com/todoist/todoist-mcp/compare/v17.1.0...v17.1.1) (2026-11-20)
 
 ### Bug Fixes
