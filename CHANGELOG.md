@@ -1,3 +1,9 @@
+## [17.1.1](https://github.com/todoist/todoist-mcp/compare/v17.1.0...v17.1.1) (2026-11-20)
+
+### Bug Fixes
+
+* check an assignee against the target project before every project ([#732](https://github.com/todoist/todoist-mcp/issues/732)) ([ec14593](https://github.com/todoist/todoist-mcp/commit/ec14593cef2e881faca2cc6d9d84f7ca6c7ca611))
+
 ## [17.1.0](https://github.com/todoist/todoist-mcp/compare/v17.0.0...v17.1.0) (2026-11-20)
 
 ### Features
