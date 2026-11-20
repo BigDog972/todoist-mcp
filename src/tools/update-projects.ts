@@ -11,6 +11,8 @@ import { appendFailureSummary } from '../utils/response-builders.js'
 import { executeWithRetry } from '../utils/retry.js'
 import { ToolNames } from '../utils/tool-names.js'
 
+const { FIND_FOLDERS } = ToolNames
+
 const ProjectUpdateSchema = z.object({
     id: z.string().min(1).describe('The ID of the project to update.'),
     name: z.string().min(1).optional().describe('The new name of the project.'),
@@ -30,6 +32,13 @@ const ProjectUpdateSchema = z.object({
         )
         .optional(),
     color: ColorSchema,
+    folderId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+            `Move a workspace project into this folder (see ${FIND_FOLDERS}), or "remove" for the workspace's top level.`,
+        ),
 })
 
 type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>
@@ -82,9 +91,18 @@ const updateProjects = {
                 const skipReason = getSkipReason(project)
                 if (skipReason !== null) return { kind: 'skipped', reason: skipReason }
 
-                // An empty `description` clears it. That is already the project
-                // wire value (backend NULL_KEEPS_UNCHANGED), so forward as-is.
-                const { id, ...updateArgs } = project
+                // The endpoint reads null differently per field. A null `description`
+                // keeps it unchanged (NULL_KEEPS_UNCHANGED), so "" is its clear value
+                // and is forwarded as-is. A null `folder_id` clears it (NULL_CLEARS),
+                // moving the project to the top level of its workspace, so a
+                // `folderId` of "remove" is sent as null.
+                const { id, folderId, ...rest } = project
+                const updateArgs = {
+                    ...rest,
+                    ...(folderId !== undefined
+                        ? { folderId: folderId === 'remove' ? null : folderId }
+                        : {}),
+                }
                 const updated = await executeWithRetry(() => client.updateProject(id, updateArgs))
                 return { kind: 'updated', project: updated }
             }),
