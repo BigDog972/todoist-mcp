@@ -1,3 +1,11 @@
+## [17.1.0](https://github.com/todoist/todoist-mcp/compare/v17.0.0...v17.1.0) (2026-11-20)
+
+### Features
+
+* create projects in a folder and move projects between folders ([#727](https://github.com/todoist/todoist-mcp/issues/727)) ([51e4b53](https://github.com/todoist/todoist-mcp/commit/51e4b532b5f447dd4ec970f537a1b41338bd6f9c))
+* create, rename and delete workspace folders ([#725](https://github.com/todoist/todoist-mcp/issues/725)) ([c02a7da](https://github.com/todoist/todoist-mcp/commit/c02a7da5a2aa49f0c141566d9ffcc33130710316)), closes [#727](https://github.com/todoist/todoist-mcp/issues/727)
+* list workspace folders and filter projects by folder ([#724](https://github.com/todoist/todoist-mcp/issues/724)) ([1662f5d](https://github.com/todoist/todoist-mcp/commit/1662f5d14e588242dd1d2b5128c7655bec703124)), closes [#727](https://github.com/todoist/todoist-mcp/issues/727)
+
 ## [17.0.0](https://github.com/todoist/todoist-mcp/compare/v16.1.1...v17.0.0) (2026-11-19)
 
 ### ⚠ BREAKING CHANGES
