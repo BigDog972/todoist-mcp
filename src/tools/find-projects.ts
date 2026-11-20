@@ -6,6 +6,7 @@ import {
     fetchAllActiveProjects,
     fetchAllArchivedProjects,
     fetchUnjoinedWorkspaceProjects,
+    isWorkspaceProject,
     mapProject,
     searchAllProjects,
 } from '../tool-helpers.js'
@@ -14,7 +15,7 @@ import { ProjectSchema as ProjectOutputSchema } from '../utils/output-schemas.js
 import { formatProjectPreview, summarizeList } from '../utils/response-builders.js'
 import { ToolNames } from '../utils/tool-names.js'
 
-const { ADD_PROJECTS, PROJECT_MANAGEMENT } = ToolNames
+const { ADD_PROJECTS, FIND_FOLDERS, PROJECT_MANAGEMENT } = ToolNames
 
 const SCOPE_NOUNS = {
     active: 'projects',
@@ -48,6 +49,11 @@ const ArgsSchema = {
         .describe(
             "Which projects to return by archive status: 'active' (default, non-archived only), 'archived' (archived only), or 'all' (both active and archived). Each project includes an isArchived field. Archived projects can be deleted via the delete-object tool (type: 'project').",
         ),
+    folderId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(`Only projects in this workspace folder (see ${FIND_FOLDERS}).`),
     includeUnjoined: z
         .boolean()
         .optional()
@@ -82,7 +88,7 @@ const OutputSchema = {
 const findProjects = {
     name: ToolNames.FIND_PROJECTS,
     description:
-        "List or search by name the projects the user has joined. By default only active projects are returned; use archivedStatus ('archived' or 'all') to include archived projects. When searching or when archivedStatus is 'all', all matching projects are returned (pagination is ignored). Otherwise projects are returned with pagination. Workspace projects the user hasn't joined are left out unless includeUnjoined is set, or a search matches no joined project.",
+        "List or search by name the projects the user has joined. By default only active projects are returned; use archivedStatus ('archived' or 'all') to include archived projects. When searching, when archivedStatus is 'all', or when listing archived projects in a folder, all matching projects are returned (pagination is ignored). Otherwise projects are returned with pagination. Workspace projects the user hasn't joined are left out unless includeUnjoined is set, or a search matches no joined project.",
     parameters: ArgsSchema,
     outputSchema: OutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
@@ -99,7 +105,7 @@ const findProjects = {
                     ? empty
                     : searchText
                       ? searchAllProjects(client, searchText)
-                      : fetchAllActiveProjects(client),
+                      : fetchAllActiveProjects(client, args.folderId),
                 archivedStatus === 'active' ? empty : fetchAllArchivedProjects(client),
             ])
 
@@ -110,7 +116,15 @@ const findProjects = {
                 ? archived.filter((project) => wildcard.test(project.name))
                 : archived
 
-            results = [...active, ...filteredArchived]
+            // A search and the archived listing take no folder filter, so the folder
+            // is applied here; the active listing was already filtered by the API.
+            const { folderId } = args
+            const combined = [...active, ...filteredArchived]
+            results = folderId
+                ? combined.filter(
+                      (project) => isWorkspaceProject(project) && project.folderId === folderId,
+                  )
+                : combined
         } else {
             // Paginated single-source path
             const response =
@@ -119,7 +133,11 @@ const findProjects = {
                           limit: args.limit,
                           cursor: args.cursor ?? null,
                       })
-                    : await client.getProjects({ limit: args.limit, cursor: args.cursor ?? null })
+                    : await client.getProjects({
+                          limit: args.limit,
+                          cursor: args.cursor ?? null,
+                          ...(args.folderId ? { folderId: args.folderId } : {}),
+                      })
             results = response.results
             nextCursor = response.nextCursor
         }
@@ -147,10 +165,15 @@ type FindProjectsArgs = z.infer<z.ZodObject<typeof ArgsSchema>>
 /**
  * Searches and `archivedStatus: 'all'` return every match at once, ignoring
  * `limit` and `cursor`: they can't cursor-paginate across two sources, or while
- * filtering archived projects client-side.
+ * filtering archived projects client-side. Archived projects in a folder are
+ * filtered client-side too, as the archived listing takes no folder filter.
  */
-function returnsAllMatches({ searchText, archivedStatus }: FindProjectsArgs): boolean {
-    return Boolean(searchText) || archivedStatus === 'all'
+function returnsAllMatches({ searchText, archivedStatus, folderId }: FindProjectsArgs): boolean {
+    return (
+        Boolean(searchText) ||
+        archivedStatus === 'all' ||
+        (Boolean(folderId) && archivedStatus === 'archived')
+    )
 }
 
 /** The unjoined workspace projects to show, capped at `limit`, out of `total` matches. */
@@ -194,7 +217,12 @@ async function findUnjoinedProjects(
     }
 
     const wildcard = searchText ? compileWildcardQuery(searchText) : null
-    const matches = wildcard ? unjoined.filter((project) => wildcard.test(project.name)) : unjoined
+    const { folderId } = args
+    const matches = unjoined.filter(
+        (project) =>
+            (!wildcard || wildcard.test(project.name)) &&
+            (!folderId || project.folderId === folderId),
+    )
     return { listed: matches.slice(0, limit), total: matches.length }
 }
 
@@ -227,6 +255,9 @@ function generateTextContent({
     if (args.archivedStatus && args.archivedStatus !== 'active') {
         filterHints.push(`archivedStatus: "${args.archivedStatus}"`)
     }
+    if (args.folderId) {
+        filterHints.push(`folderId: "${args.folderId}"`)
+    }
 
     // Generate project preview lines
     const previewLimit = 10
@@ -238,6 +269,7 @@ function generateTextContent({
 
     // Generate helpful suggestions for empty results
     const zeroReasonHints: string[] = []
+    const inFolder = args.folderId ? ' in this folder' : ''
     if (projects.length === 0) {
         if (args.searchText && unjoined?.total) {
             // The matches are listed below, among the projects the user hasn't joined.
@@ -254,17 +286,25 @@ function generateTextContent({
             zeroReasonHints.push('Try broader search terms')
             zeroReasonHints.push('Check spelling')
             zeroReasonHints.push('Remove searchText to see all projects')
+        } else if (args.folderId && unjoined?.total) {
+            // The folder's projects are listed below, among those the user hasn't joined.
+            zeroReasonHints.push('None of the projects the user has joined are in this folder')
         } else if (args.archivedStatus === 'archived') {
-            zeroReasonHints.push('No archived projects')
+            zeroReasonHints.push(`No archived projects${inFolder}`)
             zeroReasonHints.push("Use archivedStatus: 'all' to also see active projects")
         } else if (args.archivedStatus === 'all') {
-            zeroReasonHints.push('No projects created yet')
-            zeroReasonHints.push(`Use ${ADD_PROJECTS} to create a project`)
+            zeroReasonHints.push(
+                args.folderId ? 'No projects in this folder' : 'No projects created yet',
+            )
+            if (!args.folderId) zeroReasonHints.push(`Use ${ADD_PROJECTS} to create a project`)
         } else {
             // Default active-only scope: archived projects (if any) are excluded.
-            zeroReasonHints.push('No active projects')
+            zeroReasonHints.push(`No active projects${inFolder}`)
             zeroReasonHints.push("Use archivedStatus: 'all' to include archived projects")
-            zeroReasonHints.push(`Use ${ADD_PROJECTS} to create a project`)
+            if (!args.folderId) zeroReasonHints.push(`Use ${ADD_PROJECTS} to create a project`)
+        }
+        if (args.folderId && !unjoined?.total) {
+            zeroReasonHints.push(`Use ${FIND_FOLDERS} to check the folder ID`)
         }
     }
 
