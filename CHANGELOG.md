@@ -1,3 +1,14 @@
+## [17.2.0](https://github.com/todoist/todoist-mcp/compare/v17.1.2...v17.2.0) (2026-11-20)
+
+### Features
+
+* create up to 100 tasks per add-tasks call in one Sync request ([#735](https://github.com/todoist/todoist-mcp/issues/735)) ([2830622](https://github.com/todoist/todoist-mcp/commit/28306224a8dbc4be5fb9ad5430d08ca4bad794e3)), closes [#721](https://github.com/todoist/todoist-mcp/issues/721)
+
+### Bug Fixes
+
+* complete a batch of tasks in one Sync request ([#736](https://github.com/todoist/todoist-mcp/issues/736)) ([8514dc0](https://github.com/todoist/todoist-mcp/commit/8514dc03d560825188427fa05e1d384065dbd219)), closes [#731](https://github.com/todoist/todoist-mcp/issues/731)
+* reopen a batch of tasks in one Sync request ([#738](https://github.com/todoist/todoist-mcp/issues/738)) ([453becc](https://github.com/todoist/todoist-mcp/commit/453becc5af16d5329e5c0a8ddd06a3bb8e1d6172)), closes [#731](https://github.com/todoist/todoist-mcp/issues/731) [#735](https://github.com/todoist/todoist-mcp/issues/735) [#736](https://github.com/todoist/todoist-mcp/issues/736)
+
 ## [17.1.2](https://github.com/todoist/todoist-mcp/compare/v17.1.1...v17.1.2) (2026-11-20)
 
 ### Bug Fixes
