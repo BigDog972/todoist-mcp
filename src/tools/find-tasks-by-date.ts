@@ -9,6 +9,7 @@ import {
 import type { TodoistTool } from '../todoist-tool.js'
 import { getTasksByFilter, normalizePaginationCursor } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
+import { getDateInOffset, parseGmtOffsetToMinutes, shiftDateStringByDays } from '../utils/date.js'
 import { generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { getDateString, previewTasks, summarizeList } from '../utils/response-builders.js'
@@ -112,11 +113,14 @@ const findTasksByDate = {
             query = 'overdue'
         } else if (args.startDate === 'today') {
             if (args.daysCount > 1) {
-                // For multi-day ranges starting from today, build a date range query
-                const today = new Date()
-                const todayStr = getDateString(today)
-                const endDate = addDays(today, args.daysCount)
-                const endDateStr = formatISO(endDate, { representation: 'date' })
+                // For multi-day ranges starting from today, build a date range query.
+                // "Today" is the user's date in their Todoist timezone, not the server's:
+                // the hosted server runs on UTC, where it is already tomorrow for a user
+                // west of Greenwich in the evening.
+                const user = await client.getUser()
+                const offsetMinutes = parseGmtOffsetToMinutes(user.tzInfo?.gmtString || '+00:00')
+                const todayStr = getDateInOffset(new Date(), offsetMinutes)
+                const endDateStr = shiftDateStringByDays(todayStr, args.daysCount)
                 const dateRangeQuery = `(due after: ${todayStr} | due: ${todayStr}) & due before: ${endDateStr}`
                 query =
                     args.overdueOption === 'exclude-overdue'

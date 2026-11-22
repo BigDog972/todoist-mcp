@@ -1,6 +1,11 @@
 import type { TodoistApi } from '@todoist/sdk'
 import { z } from 'zod'
-import { createMockApiResponse, createMockTask, TEST_IDS } from '../utils/test-helpers.js'
+import {
+    createMockApiResponse,
+    createMockTask,
+    createMockUser,
+    TEST_IDS,
+} from '../utils/test-helpers.js'
 import { findTasksByDate } from './find-tasks-by-date.js'
 
 describe('find-tasks-by-date without a start date', () => {
@@ -25,6 +30,7 @@ describe('find-tasks-by-date without a start date', () => {
         'uses today with overdueOption=$overdueOption and daysCount=$daysCount',
         async ({ overdueOption, daysCount, query }) => {
             const client = {
+                getUser: vi.fn().mockResolvedValue(createMockUser()),
                 getTasksByFilter: vi
                     .fn()
                     .mockResolvedValue(
