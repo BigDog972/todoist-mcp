@@ -1,3 +1,9 @@
+## [17.3.8](https://github.com/todoist/todoist-mcp/compare/v17.3.7...v17.3.8) (2026-11-23)
+
+### Bug Fixes
+
+* **find-completed-tasks:** use each date's own offset across daylight saving ([#755](https://github.com/todoist/todoist-mcp/issues/755)) ([71d4ac3](https://github.com/todoist/todoist-mcp/commit/71d4ac362f00915ca68e18f03382e8cf3ebbb75e))
+
 ## [17.3.7](https://github.com/todoist/todoist-mcp/compare/v17.3.6...v17.3.7) (2026-11-23)
 
 ### Bug Fixes
