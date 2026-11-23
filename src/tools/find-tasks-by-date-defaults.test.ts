@@ -11,7 +11,7 @@ import { findTasksByDate } from './find-tasks-by-date.js'
 describe('find-tasks-by-date without a start date', () => {
     beforeEach(() => {
         vi.useFakeTimers()
-        vi.setSystemTime(new Date(2026, 10, 29, 12))
+        vi.setSystemTime(new Date('2026-11-29T12:00:00Z'))
     })
 
     afterEach(() => {
