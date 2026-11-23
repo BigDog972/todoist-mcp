@@ -1,3 +1,9 @@
+## [17.3.7](https://github.com/todoist/todoist-mcp/compare/v17.3.6...v17.3.7) (2026-11-23)
+
+### Bug Fixes
+
+* **find-tasks:** resume container searches at the next match, not a page position ([#754](https://github.com/todoist/todoist-mcp/issues/754)) ([10190d1](https://github.com/todoist/todoist-mcp/commit/10190d1ad9f25b8f7011d7f8c78589f438308bbf))
+
 ## [17.3.6](https://github.com/todoist/todoist-mcp/compare/v17.3.5...v17.3.6) (2026-11-23)
 
 ### Bug Fixes
