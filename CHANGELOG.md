@@ -1,3 +1,9 @@
+## [17.3.0](https://github.com/todoist/todoist-mcp/compare/v17.2.2...v17.3.0) (2026-11-23)
+
+### Features
+
+* **projects:** read, set and reset project icons ([#744](https://github.com/todoist/todoist-mcp/issues/744)) ([2005b5e](https://github.com/todoist/todoist-mcp/commit/2005b5e834d71db331fe5494dddf46f08f9cad11)), closes [todoist/todoist-sdk-typescript#785](https://github.com/todoist/todoist-sdk-typescript/issues/785)
+
 ## [17.2.2](https://github.com/todoist/todoist-mcp/compare/v17.2.1...v17.2.2) (2026-11-23)
 
 ### Bug Fixes
