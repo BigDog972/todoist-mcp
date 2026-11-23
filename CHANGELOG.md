@@ -1,3 +1,9 @@
+## [17.3.6](https://github.com/todoist/todoist-mcp/compare/v17.3.5...v17.3.6) (2026-11-23)
+
+### Bug Fixes
+
+* **find-tasks:** page past filtered-out tasks in project, section and parent searches ([#753](https://github.com/todoist/todoist-mcp/issues/753)) ([9363de8](https://github.com/todoist/todoist-mcp/commit/9363de86aff45c4b1e3afa2483ac09c73bab5c0c))
+
 ## [17.3.5](https://github.com/todoist/todoist-mcp/compare/v17.3.4...v17.3.5) (2026-11-23)
 
 ### Bug Fixes
