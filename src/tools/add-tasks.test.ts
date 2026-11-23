@@ -723,12 +723,58 @@ describe(`${ADD_TASKS} tool`, () => {
                 mockTodoistApi,
             )
 
-            expect(result.structuredContent.failures[0]).toEqual(
-                expect.objectContaining({
-                    item: 'One too many',
-                    error: 'Maximum number of items exceeded (HTTP 403, code 49, tag MAX_ITEMS_LIMIT_REACHED)',
-                }),
+            const failure = result.structuredContent.failures[0]
+            expect(failure?.item).toBe('One too many')
+            expect(failure?.error).toContain(
+                'Maximum number of items exceeded (HTTP 403, code 49, tag MAX_ITEMS_LIMIT_REACHED)',
             )
+            expect(failure?.error).toContain('add the task to a different project')
+        })
+
+        it('tells a free-plan user once to retry without the deadline', async () => {
+            const createdTask = createMockTask({ id: '8485093754', content: 'No deadline' })
+            const deadlineRejected = () =>
+                createApiError({
+                    status: 403,
+                    error: 'Premium only feature',
+                    tag: 'PREMIUM_ONLY',
+                })
+            createTask
+                .mockResolvedValueOnce(createdTask)
+                .mockRejectedValueOnce(deadlineRejected())
+                .mockRejectedValueOnce(deadlineRejected())
+                .mockRejectedValueOnce(deadlineRejected())
+
+            const result = await addTasks.execute(
+                {
+                    tasks: [
+                        { content: 'No deadline' },
+                        { content: 'File taxes', deadlineDate: '2026-12-31' },
+                        { content: 'Renew passport', deadlineDate: '2027-01-15' },
+                        { content: 'Book flights', deadlineDate: '2027-02-01' },
+                    ],
+                },
+                mockTodoistApi,
+            )
+
+            expect(result.structuredContent.tasks).toEqual([
+                expect.objectContaining({ id: '8485093754' }),
+            ])
+            const [first, ...repeats] = result.structuredContent.failures
+            expect(first?.item).toBe('File taxes')
+            expect(first?.error).toContain('retry without `deadlineDate`')
+            // The explanation is given once, however many tasks hit the same restriction.
+            expect(repeats).toEqual([
+                {
+                    item: 'Renew passport',
+                    error: 'Premium only feature (HTTP 403, code 0, tag PREMIUM_ONLY). Same cause and fix as the first PREMIUM_ONLY failure in this list.',
+                },
+                {
+                    item: 'Book flights',
+                    error: 'Premium only feature (HTTP 403, code 0, tag PREMIUM_ONLY). Same cause and fix as the first PREMIUM_ONLY failure in this list.',
+                },
+            ])
+            expect(result.textContent).toContain('retry without `deadlineDate`')
         })
 
         it('returns dueString retry guidance for a partial invalid-date failure', async () => {
@@ -1536,8 +1582,12 @@ describe(`${ADD_TASKS} tool`, () => {
                 mockTodoistApi,
             )
 
+            // The tag's general explanation, not the "`dueString` could not be parsed" verdict.
             expect(result.structuredContent.failures).toEqual([
-                { item: 'Water plants', error: 'Date is invalid (HTTP 400, tag INVALID_DATE)' },
+                {
+                    item: 'Water plants',
+                    error: 'Date is invalid (HTTP 400, tag INVALID_DATE). Todoist could not parse a date in this request. A due string must name one specific date or recurrence, such as "tomorrow", "Friday at 3pm", "2026-12-01" or "every weekday"; a period such as "this week" is not a date. Where a field asks for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, send exactly that, not words such as "today". Change only the date and retry.',
+                },
             ])
         })
 

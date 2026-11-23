@@ -268,19 +268,58 @@ describe('formatToolExecutionError', () => {
     })
 
     describe('formatBatchItemError', () => {
-        it('preserves API error signals lost by error.message', () => {
-            const error = Object.assign(new Error('HTTP 403: Forbidden'), {
-                httpStatusCode: 403,
-                responseData: {
-                    error: 'Maximum number of items exceeded',
-                    error_code: 49,
-                    error_tag: 'MAX_ITEMS_LIMIT_REACHED',
-                    http_code: 403,
-                },
+        it.each([
+            {
+                tag: 'MAX_ITEMS_LIMIT_REACHED',
+                status: 403,
+                code: 49,
+                error: 'Maximum number of items exceeded',
+                expected:
+                    'Maximum number of items exceeded (HTTP 403, code 49, tag MAX_ITEMS_LIMIT_REACHED). This project has reached the maximum number of active tasks per project (subtasks count toward it; completed tasks do not). The cap is the same on every Todoist plan — upgrading will not raise it — and it is not an authentication or permission problem. Complete, delete, or move existing tasks out of the project, or add the task to a different project, then retry.',
+            },
+            {
+                // No batch tool reads the activity log, so the per-item wording
+                // leaves out the advice about its date range.
+                tag: 'PREMIUM_ONLY',
+                status: 403,
+                code: 32,
+                error: 'Premium only feature',
+                expected:
+                    "Premium only feature (HTTP 403, code 32, tag PREMIUM_ONLY). The user's Todoist plan does not include a feature this item used. It is not an authentication or permission problem, and retrying the same item will not help. On a task it is most often a deadline on a free plan: retry without `deadlineDate`. Tell the user what was left out and that it needs a plan upgrade.",
+            },
+            {
+                tag: 'INVALID_DATE',
+                status: 400,
+                code: 480,
+                error: 'Date is invalid',
+                expected:
+                    'Date is invalid (HTTP 400, code 480, tag INVALID_DATE). Todoist could not parse a date in this request. A due string must name one specific date or recurrence, such as "tomorrow", "Friday at 3pm", "2026-12-01" or "every weekday"; a period such as "this week" is not a date. Where a field asks for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, send exactly that, not words such as "today". Change only the date and retry.',
+            },
+        ])(
+            'keeps the API error signals and explains the $tag tag',
+            ({ tag, status, code, error, expected }) => {
+                const apiError = Object.assign(new Error(`HTTP ${status}`), {
+                    httpStatusCode: status,
+                    responseData: {
+                        error,
+                        error_code: code,
+                        error_tag: tag,
+                        http_code: status,
+                    },
+                })
+
+                expect(formatBatchItemError(apiError)).toBe(expected)
+            },
+        )
+
+        it('adds no explanation to an error without a known tag', () => {
+            const error = Object.assign(new Error('HTTP 404: Not Found'), {
+                httpStatusCode: 404,
+                responseData: { error: 'Task not found', error_tag: 'ITEM_NOT_FOUND' },
             })
 
             expect(formatBatchItemError(error)).toBe(
-                'Maximum number of items exceeded (HTTP 403, code 49, tag MAX_ITEMS_LIMIT_REACHED)',
+                'Task not found (HTTP 404, tag ITEM_NOT_FOUND)',
             )
         })
 
