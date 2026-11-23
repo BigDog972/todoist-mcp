@@ -3,7 +3,12 @@ import { appendToQuery, resolveResponsibleUser } from '../filter-helpers.js'
 import type { TodoistTool } from '../todoist-tool.js'
 import { mapTask, normalizePaginationCursor, resolveInboxProjectId } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
-import { getDateInOffset, parseGmtOffsetToMinutes, shiftDateStringByDays } from '../utils/date.js'
+import {
+    getDateInOffset,
+    getGmtOffsetOnDate,
+    parseGmtOffsetToMinutes,
+    shiftDateStringByDays,
+} from '../utils/date.js'
 import { formatLabelsForDisplay, generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { previewTasks, summarizeList } from '../utils/response-builders.js'
@@ -166,8 +171,22 @@ const findCompletedTasks = {
             userGmtOffset,
         })
 
-        const sinceWithOffset = `${effectiveDateRange.since}T00:00:00${userGmtOffset}`
-        const untilWithOffset = `${effectiveDateRange.until}T23:59:59${userGmtOffset}`
+        // Each end takes the offset in force on its own date: the current offset is wrong
+        // for a date on the other side of a daylight-saving change.
+        const userTimezone = user.tzInfo?.timezone
+        const sinceOffset = getGmtOffsetOnDate({
+            date: effectiveDateRange.since,
+            timeZone: userTimezone,
+            fallbackOffset: userGmtOffset,
+        })
+        const untilOffset = getGmtOffsetOnDate({
+            date: effectiveDateRange.until,
+            time: '23:59:59',
+            timeZone: userTimezone,
+            fallbackOffset: userGmtOffset,
+        })
+        const sinceWithOffset = `${effectiveDateRange.since}T00:00:00${sinceOffset}`
+        const untilWithOffset = `${effectiveDateRange.until}T23:59:59${untilOffset}`
 
         // Parse and convert to UTC
         const sinceDateTime = new Date(sinceWithOffset).toISOString()
@@ -202,6 +221,7 @@ const findCompletedTasks = {
             tasks: mappedTasks,
             args: effectiveArgs,
             userGmtOffset,
+            userTimezone,
             nextCursor,
             assigneeEmail,
             assigneeNames: await getAssigneeShortNames(client, mappedTasks, user.id),
@@ -227,6 +247,7 @@ function generateTextContent({
     tasks,
     args,
     userGmtOffset,
+    userTimezone,
     nextCursor,
     assigneeEmail,
     assigneeNames,
@@ -234,6 +255,7 @@ function generateTextContent({
     tasks: ReturnType<typeof mapTask>[]
     args: ResolvedFindCompletedTasksArgs
     userGmtOffset: string
+    userTimezone: string | null | undefined
     nextCursor: string | null
     assigneeEmail?: string
     assigneeNames: ReadonlyMap<string, string>
@@ -285,7 +307,7 @@ function generateTextContent({
         // completing it, so the completed-tasks endpoints never return it while the
         // recurrence is active. Nothing in the response can show the gap, so say it
         // on every result rather than only when the list is empty.
-        notes: [recurringCompletionsNote(args, userGmtOffset)],
+        notes: [recurringCompletionsNote(args, userGmtOffset, userTimezone)],
         previewLines: previewTasks(tasks, Math.min(tasks.length, args.limit), assigneeNames),
         zeroReasonHints,
     })
@@ -302,13 +324,17 @@ function generateTextContent({
 function recurringCompletionsNote(
     args: ResolvedFindCompletedTasksArgs,
     userGmtOffset: string,
+    userTimezone: string | null | undefined,
 ): string {
     const leftOut = 'Completions of recurring tasks that are still active are not in this list.'
     if (args.getBy === 'due') {
         return `${leftOut} ${FIND_ACTIVITY} with objectType "task" and eventType "completed" reports them, but only by completion time: it cannot match a due-date range.`
     }
-    const dateFrom = `${args.since}T00:00:00${userGmtOffset}`
-    const dateTo = `${shiftDateStringByDays(args.until, 1)}T00:00:00${userGmtOffset}`
+    const dayAfterUntil = shiftDateStringByDays(args.until, 1)
+    const offsetOn = (date: string) =>
+        getGmtOffsetOnDate({ date, timeZone: userTimezone, fallbackOffset: userGmtOffset })
+    const dateFrom = `${args.since}T00:00:00${offsetOn(args.since)}`
+    const dateTo = `${dayAfterUntil}T00:00:00${offsetOn(dayAfterUntil)}`
     return `${leftOut} To include them, call ${FIND_ACTIVITY} with objectType "task", eventType "completed", dateFrom "${dateFrom}" and dateTo "${dateTo}".`
 }
 

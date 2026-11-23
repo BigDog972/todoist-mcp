@@ -439,9 +439,10 @@ describe(`${FIND_COMPLETED_TASKS} tool`, () => {
 
             expect(result.structuredContent.tasks).toHaveLength(1)
             // find-activity's dateTo is exclusive, so the inclusive `until` becomes
-            // the start of the following day.
+            // the start of the following day. Each end carries Athens's offset on that
+            // date: summer time (+03:00) until 2025-10-26, then +02:00.
             expect(result.textContent).toContain(
-                `${LEFT_OUT} To include them, call find-activity with objectType "task", eventType "completed", dateFrom "2025-10-18T00:00:00+02:00" and dateTo "2025-10-29T00:00:00+02:00".`,
+                `${LEFT_OUT} To include them, call find-activity with objectType "task", eventType "completed", dateFrom "2025-10-18T00:00:00+03:00" and dateTo "2025-10-29T00:00:00+02:00".`,
             )
         })
 
@@ -709,6 +710,86 @@ describe(`${FIND_COMPLETED_TASKS} tool`, () => {
             })
 
             expect(result.textContent).toMatchSnapshot()
+        })
+
+        it("should use each date's own offset when the range is across a daylight-saving change", async () => {
+            // Asked in winter (Chicago on -06:00) about July 4th, when Chicago is on -05:00.
+            mockTodoistApi.getUser.mockResolvedValue({
+                id: 'test-user-id',
+                fullName: 'Test User',
+                email: 'test@example.com',
+                tzInfo: {
+                    timezone: 'America/Chicago',
+                    gmtString: '-06:00',
+                    hours: -6,
+                    minutes: 0,
+                    isDst: 0,
+                },
+            } as CurrentUser)
+            mockTodoistApi.getCompletedTasksByCompletionDate.mockResolvedValue({
+                items: [],
+                nextCursor: null,
+            })
+
+            const result = await findCompletedTasks.execute(
+                {
+                    getBy: 'completion',
+                    limit: 50,
+                    since: '2026-07-04',
+                    until: '2026-07-04',
+                    labels: [],
+                    labelsOperator: 'or' as const,
+                },
+                mockTodoistApi,
+            )
+
+            // 2026-07-04 00:00:00 -05:00 to 2026-07-04 23:59:59 -05:00
+            expect(mockTodoistApi.getCompletedTasksByCompletionDate).toHaveBeenCalledWith({
+                since: '2026-07-04T05:00:00.000Z',
+                until: '2026-07-05T04:59:59.000Z',
+                limit: 50,
+            })
+            expect(result.textContent).toContain(
+                'dateFrom "2026-07-04T00:00:00-05:00" and dateTo "2026-07-05T00:00:00-05:00"',
+            )
+        })
+
+        it('should give each end of a range its own offset when a daylight-saving change falls inside it', async () => {
+            // Chicago leaves daylight saving on 2026-11-01.
+            mockTodoistApi.getUser.mockResolvedValue({
+                id: 'test-user-id',
+                fullName: 'Test User',
+                email: 'test@example.com',
+                tzInfo: {
+                    timezone: 'America/Chicago',
+                    gmtString: '-06:00',
+                    hours: -6,
+                    minutes: 0,
+                    isDst: 0,
+                },
+            } as CurrentUser)
+            mockTodoistApi.getCompletedTasksByCompletionDate.mockResolvedValue({
+                items: [],
+                nextCursor: null,
+            })
+
+            await findCompletedTasks.execute(
+                {
+                    getBy: 'completion',
+                    limit: 50,
+                    since: '2026-10-30',
+                    until: '2026-11-02',
+                    labels: [],
+                    labelsOperator: 'or' as const,
+                },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getCompletedTasksByCompletionDate).toHaveBeenCalledWith({
+                since: '2026-10-30T05:00:00.000Z',
+                until: '2026-11-03T05:59:59.000Z',
+                limit: 50,
+            })
         })
     })
 
