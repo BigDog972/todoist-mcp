@@ -5,7 +5,7 @@ import { mapTask, normalizePaginationCursor, resolveInboxProjectId } from '../to
 import { ApiLimits } from '../utils/constants.js'
 import {
     getDateInOffset,
-    getGmtOffsetOnDate,
+    getStartOfDay,
     parseGmtOffsetToMinutes,
     shiftDateStringByDays,
 } from '../utils/date.js'
@@ -172,25 +172,15 @@ const findCompletedTasks = {
         })
 
         // Each end takes the offset in force on its own date: the current offset is wrong
-        // for a date on the other side of a daylight-saving change.
+        // for a date on the other side of a daylight-saving change. The range runs from
+        // the start of `since` to the last second before the day after `until` starts.
         const userTimezone = user.tzInfo?.timezone
-        const sinceOffset = getGmtOffsetOnDate({
-            date: effectiveDateRange.since,
-            timeZone: userTimezone,
-            fallbackOffset: userGmtOffset,
-        })
-        const untilOffset = getGmtOffsetOnDate({
-            date: effectiveDateRange.until,
-            time: '23:59:59',
-            timeZone: userTimezone,
-            fallbackOffset: userGmtOffset,
-        })
-        const sinceWithOffset = `${effectiveDateRange.since}T00:00:00${sinceOffset}`
-        const untilWithOffset = `${effectiveDateRange.until}T23:59:59${untilOffset}`
-
-        // Parse and convert to UTC
-        const sinceDateTime = new Date(sinceWithOffset).toISOString()
-        const untilDateTime = new Date(untilWithOffset).toISOString()
+        const startOfDay = (date: string) =>
+            new Date(getStartOfDay({ date, timeZone: userTimezone, fallbackOffset: userGmtOffset }))
+        const sinceDateTime = startOfDay(effectiveDateRange.since).toISOString()
+        const untilDateTime = new Date(
+            startOfDay(shiftDateStringByDays(effectiveDateRange.until, 1)).getTime() - 1000,
+        ).toISOString()
         const effectiveArgs = {
             ...args,
             since: effectiveDateRange.since,
@@ -330,11 +320,10 @@ function recurringCompletionsNote(
     if (args.getBy === 'due') {
         return `${leftOut} ${FIND_ACTIVITY} with objectType "task" and eventType "completed" reports them, but only by completion time: it cannot match a due-date range.`
     }
-    const dayAfterUntil = shiftDateStringByDays(args.until, 1)
-    const offsetOn = (date: string) =>
-        getGmtOffsetOnDate({ date, timeZone: userTimezone, fallbackOffset: userGmtOffset })
-    const dateFrom = `${args.since}T00:00:00${offsetOn(args.since)}`
-    const dateTo = `${dayAfterUntil}T00:00:00${offsetOn(dayAfterUntil)}`
+    const startOfDay = (date: string) =>
+        getStartOfDay({ date, timeZone: userTimezone, fallbackOffset: userGmtOffset })
+    const dateFrom = startOfDay(args.since)
+    const dateTo = startOfDay(shiftDateStringByDays(args.until, 1))
     return `${leftOut} To include them, call ${FIND_ACTIVITY} with objectType "task", eventType "completed", dateFrom "${dateFrom}" and dateTo "${dateTo}".`
 }
 

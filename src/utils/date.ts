@@ -77,34 +77,43 @@ function getZoneOffsetMinutes(instant: number, timeZone: string): number | undef
     }
 }
 
+const MINUTE_MS = 60_000
+
 /**
- * The GMT offset (+HH:MM or -HH:MM) that a wall-clock time on a YYYY-MM-DD date has in
- * `timeZone`. A fixed offset such as the user's current `gmtString` is wrong for dates on
- * the other side of a daylight-saving change, so ranges in the past or future use this.
- * Falls back to `fallbackOffset` when the zone is missing or unknown.
+ * The first moment of a YYYY-MM-DD date in `timeZone`, as `YYYY-MM-DDT00:00:00` with the
+ * offset that names it. A fixed offset such as the user's current `gmtString` is wrong
+ * for dates on the other side of a daylight-saving change, so ranges in the past or
+ * future use this. Falls back to `fallbackOffset` when the zone is missing or unknown.
+ *
+ * Some zones change their clocks at midnight. When the clocks skip midnight, the day
+ * starts at the jump, which is midnight at the offset before it. When midnight happens
+ * twice, the day starts at the first one.
  */
-export function getGmtOffsetOnDate({
+export function getStartOfDay({
     date,
-    time = '00:00:00',
     timeZone,
     fallbackOffset,
 }: {
     date: string
-    time?: string
     timeZone: string | null | undefined
     fallbackOffset: string
 }): string {
-    if (!timeZone) return fallbackOffset
-    const wallClockAsUtc = Date.parse(`${date}T${time}Z`)
-    if (Number.isNaN(wallClockAsUtc)) return fallbackOffset
+    const withOffset = (offset: string) => `${date}T00:00:00${offset}`
+    const midnightAsUtc = Date.parse(`${date}T00:00:00Z`)
+    if (!timeZone || Number.isNaN(midnightAsUtc)) return withOffset(fallbackOffset)
 
-    // The offset depends on the instant, which depends on the offset: start from the
-    // fallback and refine. Two rounds settle it, including on the day of a change.
-    let offsetMinutes = parseGmtOffsetToMinutes(fallbackOffset)
-    for (let round = 0; round < 2; round++) {
-        const zoneOffset = getZoneOffsetMinutes(wallClockAsUtc - offsetMinutes * 60_000, timeZone)
-        if (zoneOffset === undefined) return fallbackOffset
-        offsetMinutes = zoneOffset
-    }
-    return formatGmtOffset(offsetMinutes)
+    // Offsets run from -12:00 to +14:00, so the offsets in force 14 hours either side of
+    // midnight-as-UTC are the only ones this day's midnight can have.
+    const offsetAt = (instant: number) => getZoneOffsetMinutes(instant, timeZone)
+    const before = offsetAt(midnightAsUtc - 14 * 60 * MINUTE_MS)
+    const after = offsetAt(midnightAsUtc + 14 * 60 * MINUTE_MS)
+    if (before === undefined || after === undefined) return withOffset(fallbackOffset)
+
+    // The offsets at which midnight really happens: one, two when it happens twice, or
+    // none when the clocks skip it going forward.
+    const midnights = [...new Set([before, after])].filter(
+        (offset) => offsetAt(midnightAsUtc - offset * MINUTE_MS) === offset,
+    )
+    const offset = midnights.length > 0 ? Math.max(...midnights) : before
+    return withOffset(formatGmtOffset(offset))
 }

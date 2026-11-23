@@ -712,6 +712,62 @@ describe(`${FIND_COMPLETED_TASKS} tool`, () => {
             expect(result.textContent).toMatchSnapshot()
         })
 
+        it.each([
+            {
+                name: 'midnight is skipped on the first day and 23:59:59 happens twice on the last',
+                // Asked in summer. Cairo jumps from 00:00 to 01:00 on 2026-04-24, and goes
+                // back from 24:00 to 23:00 on 2026-10-29.
+                tzInfo: { timezone: 'Africa/Cairo', gmtString: '+03:00', hours: 3, isDst: 1 },
+                since: '2026-04-24',
+                until: '2026-10-29',
+                expectedSince: '2026-04-23T22:00:00.000Z',
+                expectedUntil: '2026-10-29T21:59:59.000Z',
+                expectedHint:
+                    'dateFrom "2026-04-24T00:00:00+02:00" and dateTo "2026-10-30T00:00:00+02:00"',
+            },
+            {
+                name: 'midnight happens twice',
+                // Asked in winter. The Azores go back from 01:00 to 00:00 on 2026-10-25.
+                tzInfo: { timezone: 'Atlantic/Azores', gmtString: '-01:00', hours: -1, isDst: 0 },
+                since: '2026-10-25',
+                until: '2026-10-25',
+                expectedSince: '2026-10-25T00:00:00.000Z',
+                expectedUntil: '2026-10-26T00:59:59.000Z',
+                expectedHint:
+                    'dateFrom "2026-10-25T00:00:00+00:00" and dateTo "2026-10-26T00:00:00-01:00"',
+            },
+        ])(
+            'should cover whole days when $name',
+            async ({ tzInfo, since, until, expectedSince, expectedUntil, expectedHint }) => {
+                mockTodoistApi.getUser.mockResolvedValue(
+                    createMockUser({ tzInfo: { ...tzInfo, minutes: 0 } }),
+                )
+                mockTodoistApi.getCompletedTasksByCompletionDate.mockResolvedValue({
+                    items: [],
+                    nextCursor: null,
+                })
+
+                const result = await findCompletedTasks.execute(
+                    {
+                        getBy: 'completion',
+                        limit: 50,
+                        since,
+                        until,
+                        labels: [],
+                        labelsOperator: 'or' as const,
+                    },
+                    mockTodoistApi,
+                )
+
+                expect(mockTodoistApi.getCompletedTasksByCompletionDate).toHaveBeenCalledWith({
+                    since: expectedSince,
+                    until: expectedUntil,
+                    limit: 50,
+                })
+                expect(result.textContent).toContain(expectedHint)
+            },
+        )
+
         it("should use each date's own offset when the range is across a daylight-saving change", async () => {
             // Asked in winter (Chicago on -06:00) about July 4th, when Chicago is on -05:00.
             mockTodoistApi.getUser.mockResolvedValue({
