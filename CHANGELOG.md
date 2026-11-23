@@ -1,3 +1,9 @@
+## [17.3.2](https://github.com/todoist/todoist-mcp/compare/v17.3.1...v17.3.2) (2026-11-23)
+
+### Bug Fixes
+
+* explain known error tags in per-item batch failures ([#749](https://github.com/todoist/todoist-mcp/issues/749)) ([79777a2](https://github.com/todoist/todoist-mcp/commit/79777a2eb599a0a7f2545222e540dfee9234edfa)), closes [todoist/Issues#21671](https://github.com/todoist/Issues/issues/21671)
+
 ## [17.3.1](https://github.com/todoist/todoist-mcp/compare/v17.3.0...v17.3.1) (2026-11-23)
 
 ### Bug Fixes
