@@ -672,6 +672,30 @@ describe(`${FIND_TASKS} tool`, () => {
             },
         )
 
+        it.each([
+            { labelsOperator: 'or' as const, labels: ['@work'] },
+            { labelsOperator: 'and' as const, labels: ['@work', '@urgent'] },
+        ])(
+            'should match "@"-prefixed labels in container searches like the filter path ($labelsOperator)',
+            async ({ labelsOperator, labels }) => {
+                mockTodoistApi.getTasks.mockResolvedValue(
+                    createMockApiResponse([
+                        createMockTask({ id: '1', labels: ['work', 'urgent'] }),
+                        createMockTask({ id: '2', labels: ['other'] }),
+                    ]),
+                )
+
+                const result = await findTasks.execute(
+                    { projectId: TEST_IDS.PROJECT_TEST, limit: 10, labels, labelsOperator },
+                    mockTodoistApi,
+                )
+
+                expect(
+                    (result.structuredContent.tasks as MappedTask[]).map((task) => task.id),
+                ).toEqual(['1'])
+            },
+        )
+
         it('should handle empty labels array', async () => {
             const params = {
                 searchText: 'test',
