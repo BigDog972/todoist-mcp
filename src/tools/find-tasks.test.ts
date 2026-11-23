@@ -555,6 +555,16 @@ describe(`${FIND_TASKS} tool`, () => {
                 expectedQuery:
                     'search: follow up & (@personal  |  @shopping) & !assigned to: others',
             },
+            {
+                name: 'labels containing filter operators are escaped',
+                params: {
+                    searchText: 'budget',
+                    limit: 10,
+                    labels: ['R&D', 'Errands (car)', 'home,office'],
+                },
+                expectedQuery:
+                    'search: budget & (@R\\&D  |  @Errands \\(car\\)  |  @home\\,office) & !assigned to: others',
+            },
         ])(
             'should filter tasks by labels in text search: $name',
             async ({ params, expectedQuery }) => {

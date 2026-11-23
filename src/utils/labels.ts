@@ -1,3 +1,4 @@
+import { escapeFilterToken } from '@todoist/sdk'
 import { z } from 'zod'
 import { ApiLimits } from './constants.js'
 
@@ -22,8 +23,11 @@ export const LabelsSchema = {
 export function generateLabelsFilter(labels: string[] = [], labelsOperator: LabelsOperator = 'or') {
     if (labels.length === 0) return ''
     const operator = labelsOperator === 'and' ? ' & ' : ' | '
-    // Add @ prefix to labels for Todoist API query
-    const prefixedLabels = labels.map((label) => (label.startsWith('@') ? label : `@${label}`))
+    // Add @ prefix to labels for Todoist API query, escaping characters such as
+    // `&`, `(` and `,` that would otherwise be read as filter operators.
+    const prefixedLabels = labels.map(
+        (label) => `@${escapeFilterToken(label.startsWith('@') ? label.slice(1) : label)}`,
+    )
     const labelStr = prefixedLabels.join(` ${operator} `)
     return `(${labelStr})`
 }
