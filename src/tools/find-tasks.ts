@@ -1,4 +1,4 @@
-import { escapeFilterToken, GetTasksArgs } from '@todoist/sdk'
+import { escapeFilterToken, GetTasksArgs, type TodoistApi } from '@todoist/sdk'
 import { z } from 'zod'
 import {
     appendToQuery,
@@ -9,6 +9,8 @@ import {
 } from '../filter-helpers.js'
 import type { TodoistTool } from '../todoist-tool.js'
 import {
+    fetchAllLabelNames,
+    fetchAllSharedLabels,
     getTasksByFilter,
     type MappedTask,
     mapTask,
@@ -17,9 +19,12 @@ import {
 } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import { filterResolver } from '../utils/filter-resolver.js'
+import { collectFilteredPage, readFilteredPageCursor } from '../utils/filtered-pages.js'
 import {
+    findLabelName,
     formatLabelsForDisplay,
     generateLabelsFilter,
+    type LabelsOperator,
     LabelsSchema,
     matchesLabels,
 } from '../utils/labels.js'
@@ -114,21 +119,31 @@ const findTasks = {
         } = args
         const normalizedCursor = normalizePaginationCursor(cursor)
 
-        const todoistUser = await client.getUser()
-
-        const hasLabels = labels && labels.length > 0
-
         if (filter && filterIdOrName) {
             throw new Error(
                 'The `filter` and `filterIdOrName` parameters cannot be used together. Provide only one.',
             )
         }
 
-        if ((filter || filterIdOrName) && (projectId || sectionId || parentId)) {
+        const isContainerSearch = Boolean(projectId || sectionId || parentId)
+        if ((filter || filterIdOrName) && isContainerSearch) {
             throw new Error(
                 'The `filter`/`filterIdOrName` parameter cannot be combined with projectId, sectionId, or parentId. Use filter syntax instead (e.g. "##ProjectName").',
             )
         }
+
+        // A container search resumes from where its cursor says, with the API label it
+        // started with; only a new search looks the label up, alongside the user.
+        const resumeFrom = isContainerSearch ? readFilteredPageCursor(normalizedCursor) : undefined
+        const apiLabelLookup = !isContainerSearch
+            ? Promise.resolve(undefined)
+            : resumeFrom
+              ? Promise.resolve(readApiLabel(resumeFrom.state))
+              : resolveApiLabel(client, labels, labelsOperator)
+
+        const todoistUser = await client.getUser()
+
+        const hasLabels = labels && labels.length > 0
 
         // Resolve filterIdOrName to a filter query string
         let resolvedFilter = filter
@@ -143,11 +158,8 @@ const findTasks = {
         const assigneeEmail = resolved?.email
 
         // If using container-based filtering, use direct API
-        if (projectId || sectionId || parentId) {
-            const taskParams: GetTasksArgs = {
-                limit,
-                cursor: normalizedCursor ?? null,
-            }
+        if (isContainerSearch) {
+            const taskParams: Omit<GetTasksArgs, 'cursor' | 'limit'> = {}
 
             if (projectId) {
                 taskParams.projectId = await resolveInboxProjectId({ projectId, user: todoistUser })
@@ -155,32 +167,34 @@ const findTasks = {
             if (sectionId) taskParams.sectionId = sectionId
             if (parentId) taskParams.parentId = parentId
 
-            const { results, nextCursor } = await client.getTasks(taskParams)
-            const mappedTasks = results.map(mapTask)
+            const apiLabel = await apiLabelLookup
+            if (apiLabel) taskParams.label = apiLabel
 
-            // Apply search text filter
-            let filteredTasks = searchText
-                ? mappedTasks.filter(
-                      (task) =>
-                          task.content.toLowerCase().includes(searchText.toLowerCase()) ||
-                          task.description?.toLowerCase().includes(searchText.toLowerCase()),
-                  )
-                : mappedTasks
-
-            // Apply responsibleUid filter
-            filteredTasks = filterTasksByResponsibleUser({
-                tasks: filteredTasks,
-                resolvedAssigneeId,
-                currentUserId: todoistUser.id,
-                responsibleUserFiltering,
+            const lowerSearchText = searchText?.toLowerCase()
+            const { items: filteredTasks, nextCursor } = await collectFilteredPage({
+                fetchPage: async (page) => {
+                    const { results, nextCursor } = await client.getTasks({
+                        ...taskParams,
+                        ...page,
+                    })
+                    return { results: results.map(mapTask), nextCursor }
+                },
+                matches: (task) =>
+                    (!lowerSearchText ||
+                        task.content.toLowerCase().includes(lowerSearchText) ||
+                        Boolean(task.description?.toLowerCase().includes(lowerSearchText))) &&
+                    filterTasksByResponsibleUser({
+                        tasks: [task],
+                        resolvedAssigneeId,
+                        currentUserId: todoistUser.id,
+                        responsibleUserFiltering,
+                    }).length === 1 &&
+                    (!labels?.length || matchesLabels(task.labels, labels, labelsOperator)),
+                limit,
+                maxPageSize: ApiLimits.TASKS_PAGE_MAX,
+                from: resumeFrom,
+                state: apiLabel ? ({ apiLabel } satisfies ContainerCursorState) : undefined,
             })
-
-            // Apply label filter
-            if (labels && labels.length > 0) {
-                filteredTasks = filteredTasks.filter((task) =>
-                    matchesLabels(task.labels, labels, labelsOperator),
-                )
-            }
 
             const textContent = generateTextContent({
                 tasks: filteredTasks,
@@ -298,6 +312,62 @@ const findTasks = {
         }
     },
 } satisfies TodoistTool<typeof ArgsSchema, typeof OutputSchema>
+
+/**
+ * Saved in a container search's cursor. The cursor counts tasks of the pages the API
+ * returned, so a resumed search must ask for the same pages.
+ */
+const ContainerCursorStateSchema = z.object({ apiLabel: z.string().optional() })
+type ContainerCursorState = z.infer<typeof ContainerCursorStateSchema>
+
+/**
+ * The API label a container search started with. None for a cursor the API issued
+ * directly, since that search did not filter on one.
+ */
+function readApiLabel(state: unknown): string | undefined {
+    if (state === undefined) return undefined
+    const parsed = ContainerCursorStateSchema.safeParse(state)
+    if (!parsed.success) {
+        throw new Error(
+            'Invalid cursor. Pass the nextCursor from the previous call unchanged, with the same parameters.',
+        )
+    }
+    return parsed.data.apiLabel
+}
+
+/**
+ * A label the API can filter a container search on itself, so fewer pages need
+ * fetching: the only label requested, or one of several that must all be present.
+ * The API compares names exactly, so the label is first matched to the user's own
+ * spelling of it, ignoring case and accents. Undefined when the API cannot filter
+ * on the labels requested, or no label name matches.
+ */
+async function resolveApiLabel(
+    client: TodoistApi,
+    labels: string[] | undefined,
+    labelsOperator: LabelsOperator | undefined,
+): Promise<string | undefined> {
+    if (!labels?.length || (labels.length > 1 && labelsOperator !== 'and')) return undefined
+
+    try {
+        const [personalLabels, sharedLabels] = await Promise.all([
+            fetchAllLabelNames(client),
+            fetchAllSharedLabels(client),
+        ])
+        const names = [...personalLabels, ...sharedLabels]
+        for (const label of labels) {
+            const name = findLabelName(label, names)
+            if (name) return name
+        }
+        return undefined
+    } catch (error) {
+        console.error(
+            `${ToolNames.FIND_TASKS}: could not look up label names, filtering labels after fetching`,
+            error,
+        )
+        return undefined
+    }
+}
 
 function getContainerZeroReasonHints(args: z.infer<z.ZodObject<typeof ArgsSchema>>): string[] {
     if (args.projectId) {

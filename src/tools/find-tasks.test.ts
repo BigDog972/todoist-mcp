@@ -4,6 +4,7 @@ import { getTasksByFilter, MappedTask } from '../tool-helpers.js'
 import {
     createMappedTask,
     createMockApiResponse,
+    createMockLabel,
     createMockTask,
     createMockUser,
     TEST_ERRORS,
@@ -18,6 +19,8 @@ vi.mock('../tool-helpers', async () => {
     const actual = (await vi.importActual('../tool-helpers')) as typeof import('../tool-helpers.js')
     return {
         getTasksByFilter: vi.fn(),
+        fetchAllLabelNames: actual.fetchAllLabelNames,
+        fetchAllSharedLabels: actual.fetchAllSharedLabels,
         mapTask: actual.mapTask,
         normalizePaginationCursor: actual.normalizePaginationCursor,
         filterTasksByResponsibleUser: actual.filterTasksByResponsibleUser,
@@ -53,6 +56,8 @@ const mockTodoistApi = {
     getTasks: vi.fn(),
     getTasksByFilter: vi.fn(),
     getUser: vi.fn(),
+    getLabels: vi.fn(),
+    getSharedLabels: vi.fn(),
 } as unknown as Mocked<TodoistApi>
 
 // Mock the Todoist User
@@ -61,6 +66,8 @@ const mockTodoistUser = createMockUser()
 describe(`${FIND_TASKS} tool`, () => {
     beforeEach(() => {
         mockTodoistApi.getUser.mockResolvedValue(mockTodoistUser)
+        mockTodoistApi.getLabels.mockResolvedValue(createMockApiResponse([]))
+        mockTodoistApi.getSharedLabels.mockResolvedValue(createMockApiResponse([]))
         vi.clearAllMocks()
     })
 
@@ -695,6 +702,227 @@ describe(`${FIND_TASKS} tool`, () => {
                 ).toEqual(['1'])
             },
         )
+
+        it('should find matches beyond the first page of a project', async () => {
+            // The first page holds only tasks assigned to someone else, which the default
+            // 'unassignedOrMe' scope drops, so the match is on the second page.
+            mockTodoistApi.getTasks
+                .mockResolvedValueOnce({
+                    results: Array.from({ length: 10 }, (_, index) =>
+                        createMockTask({ id: `others-${index}`, responsibleUid: 'someone-else' }),
+                    ),
+                    nextCursor: 'cursor-after-page-1',
+                })
+                .mockResolvedValueOnce({
+                    results: [createMockTask({ id: 'mine', responsibleUid: null })],
+                    nextCursor: null,
+                })
+
+            const result = await findTasks.execute(
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 10 },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getTasks.mock.calls.map(([args]) => args)).toEqual([
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 10, cursor: null },
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 200, cursor: 'cursor-after-page-1' },
+            ])
+            expect((result.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['mine'],
+            )
+            expect(result.structuredContent.hasMore).toBe(false)
+        })
+
+        it('should let the API filter a single label, by its real name', async () => {
+            mockTodoistApi.getLabels.mockResolvedValue(
+                createMockApiResponse([createMockLabel({ name: 'work' })]),
+            )
+            mockTodoistApi.getTasks.mockResolvedValue(
+                createMockApiResponse([createMockTask({ id: '1', labels: ['work'] })]),
+            )
+
+            const result = await findTasks.execute(
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 10, labels: ['@Work'] },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getTasks).toHaveBeenCalledWith({
+                projectId: TEST_IDS.PROJECT_TEST,
+                label: 'work',
+                limit: 10,
+                cursor: null,
+            })
+            expect((result.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['1'],
+            )
+        })
+
+        it('should let the API filter a label found only among shared labels', async () => {
+            mockTodoistApi.getSharedLabels.mockResolvedValue(createMockApiResponse(['Errands']))
+            mockTodoistApi.getTasks.mockResolvedValue(
+                createMockApiResponse([createMockTask({ id: '1', labels: ['Errands'] })]),
+            )
+
+            await findTasks.execute(
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 10, labels: ['errands'] },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getTasks).toHaveBeenCalledWith({
+                projectId: TEST_IDS.PROJECT_TEST,
+                label: 'Errands',
+                limit: 10,
+                cursor: null,
+            })
+        })
+
+        it('should reuse the label it resolved on later pages, without looking it up again', async () => {
+            mockTodoistApi.getLabels.mockResolvedValue(
+                createMockApiResponse([createMockLabel({ name: 'work' })]),
+            )
+            mockTodoistApi.getTasks.mockImplementation(async () =>
+                createMockApiResponse(
+                    ['1', '2', '3'].map((id) => createMockTask({ id, labels: ['work'] })),
+                ),
+            )
+            const params = { projectId: TEST_IDS.PROJECT_TEST, limit: 2, labels: ['Work'] }
+
+            const first = await findTasks.execute(params, mockTodoistApi)
+            const second = await findTasks.execute(
+                { ...params, cursor: first.structuredContent.nextCursor },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getLabels).toHaveBeenCalledTimes(1)
+            expect(mockTodoistApi.getTasks).toHaveBeenLastCalledWith(
+                expect.objectContaining({ label: 'work' }),
+            )
+            expect((second.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['3'],
+            )
+        })
+
+        it('should keep filtering labels after fetching when resuming a search whose lookup failed', async () => {
+            // The cursor counts tasks of unfiltered pages, so turning on the API label filter
+            // when resuming would skip matches.
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+            mockTodoistApi.getLabels
+                .mockRejectedValueOnce(new Error('Network error'))
+                .mockResolvedValue(createMockApiResponse([createMockLabel({ name: 'work' })]))
+            const projectTasks = [
+                createMockTask({ id: '1', labels: ['work'] }),
+                createMockTask({ id: '2', labels: ['other'] }),
+                createMockTask({ id: '3', labels: ['work'] }),
+                createMockTask({ id: '4', labels: ['work'] }),
+            ]
+            // Like the API, drop tasks without the label when one is given.
+            mockTodoistApi.getTasks.mockImplementation(async (args) => {
+                const label = args?.label
+                return createMockApiResponse(
+                    label
+                        ? projectTasks.filter((task) => task.labels.includes(label))
+                        : projectTasks,
+                )
+            })
+            const params = { projectId: TEST_IDS.PROJECT_TEST, limit: 2, labels: ['work'] }
+
+            const first = await findTasks.execute(params, mockTodoistApi)
+            const second = await findTasks.execute(
+                { ...params, cursor: first.structuredContent.nextCursor },
+                mockTodoistApi,
+            )
+
+            expect((second.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['4'],
+            )
+            expect(mockTodoistApi.getTasks).toHaveBeenLastCalledWith(
+                expect.not.objectContaining({ label: expect.anything() }),
+            )
+            consoleError.mockRestore()
+        })
+
+        it('should let the API filter one of several "and" labels', async () => {
+            mockTodoistApi.getLabels.mockResolvedValue(
+                createMockApiResponse([
+                    createMockLabel({ name: 'work' }),
+                    createMockLabel({ name: 'urgent' }),
+                ]),
+            )
+            mockTodoistApi.getTasks.mockResolvedValue(
+                createMockApiResponse([
+                    createMockTask({ id: '1', labels: ['work', 'urgent'] }),
+                    createMockTask({ id: '2', labels: ['work'] }),
+                ]),
+            )
+
+            const result = await findTasks.execute(
+                {
+                    projectId: TEST_IDS.PROJECT_TEST,
+                    limit: 10,
+                    labels: ['Work', 'Urgent'],
+                    labelsOperator: 'and',
+                },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getTasks).toHaveBeenCalledWith(
+                expect.objectContaining({ label: 'work' }),
+            )
+            expect((result.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['1'],
+            )
+        })
+
+        it('should not let the API filter several "or" labels', async () => {
+            mockTodoistApi.getTasks.mockResolvedValue(
+                createMockApiResponse([
+                    createMockTask({ id: '1', labels: ['work'] }),
+                    createMockTask({ id: '2', labels: ['Home'] }),
+                    createMockTask({ id: '3', labels: ['other'] }),
+                ]),
+            )
+
+            const result = await findTasks.execute(
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 10, labels: ['Work', 'home'] },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getLabels).not.toHaveBeenCalled()
+            expect(mockTodoistApi.getTasks).toHaveBeenCalledWith({
+                projectId: TEST_IDS.PROJECT_TEST,
+                limit: 10,
+                cursor: null,
+            })
+            expect((result.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['1', '2'],
+            )
+        })
+
+        it('should filter labels client-side when the label lookup fails', async () => {
+            mockTodoistApi.getLabels.mockRejectedValue(new Error('Network error'))
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+            mockTodoistApi.getTasks.mockResolvedValue(
+                createMockApiResponse([
+                    createMockTask({ id: '1', labels: ['work'] }),
+                    createMockTask({ id: '2', labels: ['other'] }),
+                ]),
+            )
+
+            const result = await findTasks.execute(
+                { projectId: TEST_IDS.PROJECT_TEST, limit: 10, labels: ['work'] },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getTasks).toHaveBeenCalledWith({
+                projectId: TEST_IDS.PROJECT_TEST,
+                limit: 10,
+                cursor: null,
+            })
+            expect((result.structuredContent.tasks as MappedTask[]).map((task) => task.id)).toEqual(
+                ['1'],
+            )
+            consoleError.mockRestore()
+        })
 
         it('should handle empty labels array', async () => {
             const params = {
