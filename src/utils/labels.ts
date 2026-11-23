@@ -40,6 +40,22 @@ export function generateLabelsFilter(labels: string[] = [], labelsOperator: Labe
 }
 
 /**
+ * Whether a task's labels satisfy the requested labels, for searches that filter
+ * client-side. Requested names are read the same way as in `generateLabelsFilter`,
+ * so `@work` matches a task labelled `work` on both paths.
+ */
+export function matchesLabels(
+    taskLabels: string[],
+    labels: string[],
+    labelsOperator: LabelsOperator = 'or',
+): boolean {
+    const names = labels.map(toLabelName)
+    return labelsOperator === 'and'
+        ? names.every((name) => taskLabels.includes(name))
+        : names.some((name) => taskLabels.includes(name))
+}
+
+/**
  * The labels as `@name`, joined by the operator, for the summary shown to the model.
  * Names are shown as given, without the escaping a filter query needs.
  */

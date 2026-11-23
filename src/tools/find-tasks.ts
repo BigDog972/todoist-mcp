@@ -17,7 +17,12 @@ import {
 } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import { filterResolver } from '../utils/filter-resolver.js'
-import { formatLabelsForDisplay, generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
+import {
+    formatLabelsForDisplay,
+    generateLabelsFilter,
+    LabelsSchema,
+    matchesLabels,
+} from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { previewTasks, summarizeList } from '../utils/response-builders.js'
 import { ToolNames } from '../utils/tool-names.js'
@@ -172,14 +177,9 @@ const findTasks = {
 
             // Apply label filter
             if (labels && labels.length > 0) {
-                filteredTasks =
-                    labelsOperator === 'and'
-                        ? filteredTasks.filter((task) =>
-                              labels.every((label) => task.labels.includes(label)),
-                          )
-                        : filteredTasks.filter((task) =>
-                              labels.some((label) => task.labels.includes(label)),
-                          )
+                filteredTasks = filteredTasks.filter((task) =>
+                    matchesLabels(task.labels, labels, labelsOperator),
+                )
             }
 
             const textContent = generateTextContent({

@@ -1,4 +1,4 @@
-import { formatLabelsForDisplay, generateLabelsFilter } from './labels.js'
+import { formatLabelsForDisplay, generateLabelsFilter, matchesLabels } from './labels.js'
 
 describe('generateLabelsFilter', () => {
     it('returns an empty string when there are no labels', () => {
@@ -52,5 +52,27 @@ describe('formatLabelsForDisplay', () => {
 
     it('trims whitespace and leaves filter operators unescaped', () => {
         expect(formatLabelsForDisplay([' R&D ', ' @Errands (car)'])).toBe('@R&D | @Errands (car)')
+    })
+})
+
+describe('matchesLabels', () => {
+    const taskLabels = ['work', 'R&D']
+
+    it.each([
+        { labels: ['work'], operator: 'or' as const, expected: true },
+        { labels: ['@work'], operator: 'or' as const, expected: true },
+        { labels: [' @R&D '], operator: 'or' as const, expected: true },
+        { labels: ['@home'], operator: 'or' as const, expected: false },
+        { labels: ['@work', '@R&D'], operator: 'and' as const, expected: true },
+        { labels: ['@work', '@home'], operator: 'and' as const, expected: false },
+    ])(
+        'reads $labels with $operator the way the filter query does',
+        ({ labels, operator, expected }) => {
+            expect(matchesLabels(taskLabels, labels, operator)).toBe(expected)
+        },
+    )
+
+    it('defaults to "or"', () => {
+        expect(matchesLabels(taskLabels, ['@home', '@work'])).toBe(true)
     })
 })
