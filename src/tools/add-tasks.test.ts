@@ -773,7 +773,7 @@ describe(`${ADD_TASKS} tool`, () => {
             expect(result.structuredContent.failures).toEqual([
                 {
                     item: 'Water plants',
-                    error: 'Task "Water plants" wasn\'t created because `dueString` could not be parsed. Change only `dueString` and retry.',
+                    error: 'Task "Water plants" wasn\'t created because `dueString` could not be parsed. A due string must name one specific date or recurrence, such as "tomorrow", "Friday at 3pm", "2026-12-01" or "every weekday"; a period such as "this week" is not a date. Change only `dueString` and retry.',
                 },
             ])
         })

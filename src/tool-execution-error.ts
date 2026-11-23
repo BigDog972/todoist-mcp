@@ -271,12 +271,33 @@ function hasKnownApiErrorKeys(responseData: Record<string, unknown> | undefined)
 }
 
 /**
+ * What a parseable due string looks like. "this week" and its translations are the
+ * most common due string Todoist rejects from this server.
+ */
+const DUE_STRING_GUIDANCE =
+    'A due string must name one specific date or recurrence, such as "tomorrow", "Friday at 3pm", "2026-12-01" or "every weekday"; a period such as "this week" is not a date.'
+
+/**
  * Targeted guidance for specific Todoist API errors, keyed by canonical
  * `error_tag`. These take precedence over the generic status-code hints:
  * e.g. a full project surfaces as HTTP 403, and without this mapping the
  * error would be indistinguishable from an auth/permission failure.
  */
 const TODOIST_ERROR_TAG_HINTS: Record<string, string> = {
+    // Seen for a deadline sent by a free-plan user (task creates and updates), for
+    // activity older than the plan's history limit, and for location reminders.
+    PREMIUM_ONLY:
+        "The user's Todoist plan does not include a feature this request used. " +
+        'It is not an authentication or permission problem, and retrying the same request will not help. ' +
+        'Most often it is a deadline on a free plan: retry without `deadlineDate`. ' +
+        'Activity history only goes back as far as the plan allows: retry with a more recent date range. ' +
+        'Tell the user what was left out and that it needs a plan upgrade.',
+    // Seen for an unparseable due string on a create, and for a reschedule sent
+    // "today" or a malformed time where an ISO date belongs.
+    INVALID_DATE:
+        `Todoist could not parse a date in this request. ${DUE_STRING_GUIDANCE} ` +
+        'Where a field asks for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, send exactly that, not words such as "today". ' +
+        'Change only the date and retry.',
     MAX_ITEMS_LIMIT_REACHED:
         'This project has reached the maximum number of active tasks per project (subtasks count toward it; completed tasks do not). ' +
         'The cap is the same on every Todoist plan — upgrading will not raise it — and it is not an authentication or permission problem. ' +
@@ -603,7 +624,7 @@ export function formatDueStringParseError(
         return `Task "${taskContent}" wasn't created because \`dueString\` could not be parsed. Use a complete Todoist recurrence expression; \`recurring\` alone is not valid. Change only \`dueString\` and retry.`
     }
 
-    return `Task "${taskContent}" wasn't created because \`dueString\` could not be parsed. Change only \`dueString\` and retry.`
+    return `Task "${taskContent}" wasn't created because \`dueString\` could not be parsed. ${DUE_STRING_GUIDANCE} Change only \`dueString\` and retry.`
 }
 
 /**

@@ -220,6 +220,53 @@ describe('formatToolExecutionError', () => {
         })
     })
 
+    describe('plan-restricted features (PREMIUM_ONLY)', () => {
+        // The shape a rejected Sync command is settled with: the SDK's camelCase status.
+        const deadlineOnFreePlan = Object.assign(new Error('Premium only feature'), {
+            httpStatusCode: 403,
+            responseData: {
+                error: 'Premium only feature',
+                errorCode: 32,
+                errorTag: 'PREMIUM_ONLY',
+                httpCode: 403,
+                errorExtra: { explanation: 'Deadlines are a premium only feature' },
+            },
+        })
+
+        it('explains the plan restriction instead of the generic 403 access hint', () => {
+            const output = formatToolExecutionError(deadlineOnFreePlan)
+
+            expect(output).toContain(
+                'Todoist API request failed (HTTP 403, code 32, tag PREMIUM_ONLY).',
+            )
+            expect(output).toContain("Try next: The user's Todoist plan does not include")
+            expect(output).toContain('retry without `deadlineDate`')
+            expect(output).toContain('retry with a more recent date range')
+            expect(output).not.toContain('insufficient token scope')
+        })
+    })
+
+    describe('unparseable dates (INVALID_DATE)', () => {
+        const invalidDate = Object.assign(new Error('Date is invalid'), {
+            httpStatusCode: 400,
+            responseData: {
+                error: 'Date is invalid',
+                errorCode: 480,
+                errorTag: 'INVALID_DATE',
+                httpCode: 400,
+            },
+        })
+
+        it('says what a parseable date looks like instead of the generic 400 hint', () => {
+            const output = formatToolExecutionError(invalidDate)
+
+            expect(output).toContain('Try next: Todoist could not parse a date in this request.')
+            expect(output).toContain('a period such as "this week" is not a date')
+            expect(output).toContain('YYYY-MM-DD')
+            expect(output).not.toContain('Check parameter values and formats')
+        })
+    })
+
     describe('formatBatchItemError', () => {
         it('preserves API error signals lost by error.message', () => {
             const error = Object.assign(new Error('HTTP 403: Forbidden'), {
@@ -293,7 +340,7 @@ describe('formatToolExecutionError', () => {
                     dueString: 'blursday',
                 }),
             ).toBe(
-                'Task "Water plants" wasn\'t created because `dueString` could not be parsed. Change only `dueString` and retry.',
+                'Task "Water plants" wasn\'t created because `dueString` could not be parsed. A due string must name one specific date or recurrence, such as "tomorrow", "Friday at 3pm", "2026-12-01" or "every weekday"; a period such as "this week" is not a date. Change only `dueString` and retry.',
             )
         })
 
@@ -331,7 +378,7 @@ describe('formatToolExecutionError', () => {
                     dueString: 'tomorrow',
                 }),
             ).toBe(
-                'Task "Lavendel abschneiden" wasn\'t created because `dueString` could not be parsed. Change only `dueString` and retry.',
+                'Task "Lavendel abschneiden" wasn\'t created because `dueString` could not be parsed. A due string must name one specific date or recurrence, such as "tomorrow", "Friday at 3pm", "2026-12-01" or "every weekday"; a period such as "this week" is not a date. Change only `dueString` and retry.',
             )
         })
 
