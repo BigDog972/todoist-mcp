@@ -16,11 +16,7 @@ const OutputSchema = {
     startDayName: z.string().describe('The name of the start day.'),
     weekStartDate: z.string().describe('The start date of the current week (YYYY-MM-DD).'),
     weekEndDate: z.string().describe('The end date of the current week (YYYY-MM-DD).'),
-    currentWeekNumber: z
-        .number()
-        .describe(
-            'The number of the current week (weekStartDate to weekEndDate), by the ISO 8601 rule.',
-        ),
+    currentWeekNumber: z.number().describe('The current week number of the year.'),
     completedToday: z.number().describe('The number of tasks completed today.'),
     dailyGoal: z.number().describe('The daily goal for task completions.'),
     weeklyGoal: z.number().describe('The weekly goal for task completions.'),
