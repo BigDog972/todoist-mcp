@@ -1,3 +1,9 @@
+## [17.3.3](https://github.com/todoist/todoist-mcp/compare/v17.3.2...v17.3.3) (2026-11-23)
+
+### Bug Fixes
+
+* **find-tasks-by-date:** start a multi-day "today" range on the user's date ([#739](https://github.com/todoist/todoist-mcp/issues/739)) ([c3c8cad](https://github.com/todoist/todoist-mcp/commit/c3c8cade20d75a72c0e99de9ee00e90735105a5e))
+
 ## [17.3.2](https://github.com/todoist/todoist-mcp/compare/v17.3.1...v17.3.2) (2026-11-23)
 
 ### Bug Fixes
