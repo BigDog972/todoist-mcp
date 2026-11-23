@@ -434,6 +434,30 @@ describe(`${FIND_TASKS_BY_DATE} tool`, () => {
             )
         })
 
+        it('should show labels given with @ only once in the summary', async () => {
+            mockGetTasksByFilter.mockResolvedValue({ tasks: [], nextCursor: null })
+
+            const result = await findTasksByDate.execute(
+                {
+                    startDate: '2025-08-20',
+                    daysCount: 1,
+                    limit: 50,
+                    labels: ['@work', ' personal '],
+                    labelsOperator: 'and',
+                },
+                mockTodoistApi,
+            )
+
+            expect(mockGetTasksByFilter).toHaveBeenCalledWith({
+                client: mockTodoistApi,
+                query: '(due after: 2025-08-20 | due: 2025-08-20) & due before: 2025-08-21 & ((@work  &  @personal)) & !assigned to: others',
+                cursor: undefined,
+                limit: 50,
+            })
+            expect(result.textContent).toContain('labels: @work & @personal')
+            expect(result.textContent).not.toContain('@@')
+        })
+
         it('should handle empty labels array', async () => {
             const params = {
                 startDate: 'today' as const,

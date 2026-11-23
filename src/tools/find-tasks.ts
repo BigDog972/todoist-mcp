@@ -17,7 +17,7 @@ import {
 } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import { filterResolver } from '../utils/filter-resolver.js'
-import { generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
+import { formatLabelsForDisplay, generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { previewTasks, summarizeList } from '../utils/response-builders.js'
 import { ToolNames } from '../utils/tool-names.js'
@@ -379,9 +379,7 @@ function generateTextContent({
 
         // Add label filter information
         if (args.labels && args.labels.length > 0) {
-            const labelText = args.labels
-                .map((label) => `@${label}`)
-                .join(args.labelsOperator === 'and' ? ' & ' : ' | ')
+            const labelText = formatLabelsForDisplay(args.labels, args.labelsOperator)
             filterHints.push(`labels: ${labelText}`)
         }
 
@@ -405,9 +403,7 @@ function generateTextContent({
             subjectParts.push(`assigned to ${email}`)
         }
         if (args.labels && args.labels.length > 0) {
-            const labelText = args.labels
-                .map((label) => `@${label}`)
-                .join(args.labelsOperator === 'and' ? ' & ' : ' | ')
+            const labelText = formatLabelsForDisplay(args.labels, args.labelsOperator)
             subjectParts.push(`with labels: ${labelText}`)
         }
 
@@ -422,9 +418,7 @@ function generateTextContent({
             subject = `Tasks assigned to ${email}`
             if (args.filter) filterHints.push(`filter: ${args.filter}`)
         } else if (args.labels && args.labels.length > 0 && !args.responsibleUser) {
-            const labelText = args.labels
-                .map((label) => `@${label}`)
-                .join(args.labelsOperator === 'and' ? ' & ' : ' | ')
+            const labelText = formatLabelsForDisplay(args.labels, args.labelsOperator)
             subject = `Tasks with labels: ${labelText}`
             if (args.filter) filterHints.push(`filter: ${args.filter}`)
         } else {
@@ -436,9 +430,7 @@ function generateTextContent({
             filterHints.push(`assigned to ${email}`)
         }
         if (args.labels && args.labels.length > 0) {
-            const labelText = args.labels
-                .map((label) => `@${label}`)
-                .join(args.labelsOperator === 'and' ? ' & ' : ' | ')
+            const labelText = formatLabelsForDisplay(args.labels, args.labelsOperator)
             filterHints.push(`labels: ${labelText}`)
         }
 

@@ -628,6 +628,34 @@ describe(`${FIND_COMPLETED_TASKS} tool`, () => {
             const textContent = result.textContent
             expect(textContent).toMatchSnapshot()
         })
+
+        it('should show labels given with @ only once in the summary', async () => {
+            mockTodoistApi.getCompletedTasksByCompletionDate.mockResolvedValue({
+                items: [],
+                nextCursor: null,
+            })
+
+            const result = await findCompletedTasks.execute(
+                {
+                    getBy: 'completion',
+                    since: '2025-08-01',
+                    until: '2025-08-31',
+                    limit: 50,
+                    labels: ['@work', ' personal '],
+                },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.getCompletedTasksByCompletionDate).toHaveBeenCalledWith({
+                since: '2025-08-01T00:00:00.000Z',
+                until: '2025-08-31T23:59:59.000Z',
+                limit: 50,
+                filterQuery: '(@work  |  @personal)',
+                filterLang: 'en',
+            })
+            expect(result.textContent).toContain('labels: @work | @personal')
+            expect(result.textContent).not.toContain('@@')
+        })
     })
 
     describe('timezone handling', () => {
