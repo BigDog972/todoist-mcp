@@ -1,3 +1,9 @@
+## [17.3.4](https://github.com/todoist/todoist-mcp/compare/v17.3.3...v17.3.4) (2026-11-23)
+
+### Bug Fixes
+
+* escape label names in task filter queries ([#740](https://github.com/todoist/todoist-mcp/issues/740)) ([c6a1dfc](https://github.com/todoist/todoist-mcp/commit/c6a1dfc0e7f356ba2d634c585b7b6b4474df84fa))
+
 ## [17.3.3](https://github.com/todoist/todoist-mcp/compare/v17.3.2...v17.3.3) (2026-11-23)
 
 ### Bug Fixes
