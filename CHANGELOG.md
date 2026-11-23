@@ -1,3 +1,9 @@
+## [17.3.5](https://github.com/todoist/todoist-mcp/compare/v17.3.4...v17.3.5) (2026-11-23)
+
+### Bug Fixes
+
+* **find-tasks:** match "@"-prefixed labels in project, section and parent searches ([#752](https://github.com/todoist/todoist-mcp/issues/752)) ([e916b9f](https://github.com/todoist/todoist-mcp/commit/e916b9fb55095b5526db0fad59127ece456f288d))
+
 ## [17.3.4](https://github.com/todoist/todoist-mcp/compare/v17.3.3...v17.3.4) (2026-11-23)
 
 ### Bug Fixes
