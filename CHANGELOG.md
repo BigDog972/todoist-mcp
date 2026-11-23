@@ -1,3 +1,9 @@
+## [17.2.2](https://github.com/todoist/todoist-mcp/compare/v17.2.1...v17.2.2) (2026-11-23)
+
+### Bug Fixes
+
+* **deps:** update dependency @todoist/mcp-core to v1.1.0 ([#741](https://github.com/todoist/todoist-mcp/issues/741)) ([b7e900b](https://github.com/todoist/todoist-mcp/commit/b7e900b04b62f9404316b1b8550e9bb5dc3d1cc3))
+
 ## [17.2.1](https://github.com/todoist/todoist-mcp/compare/v17.2.0...v17.2.1) (2026-11-22)
 
 ### Bug Fixes
