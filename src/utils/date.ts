@@ -48,3 +48,72 @@ export function shiftDateStringByDays(dateString: string, days: number): string 
     date.setUTCDate(date.getUTCDate() + days)
     return formatUtcDate(date)
 }
+
+/**
+ * Format a number of minutes east of UTC as a GMT offset string (+HH:MM or -HH:MM).
+ */
+function formatGmtOffset(offsetMinutes: number): string {
+    const sign = offsetMinutes < 0 ? '-' : '+'
+    const total = Math.abs(offsetMinutes)
+    const hours = String(Math.floor(total / 60)).padStart(2, '0')
+    const minutes = String(total % 60).padStart(2, '0')
+    return `${sign}${hours}:${minutes}`
+}
+
+/**
+ * Minutes east of UTC that `timeZone` observes at `instant`, or undefined when the
+ * runtime does not know the zone.
+ */
+function getZoneOffsetMinutes(instant: number, timeZone: string): number | undefined {
+    try {
+        const zoneName = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+            .formatToParts(instant)
+            .find((part) => part.type === 'timeZoneName')?.value
+        if (zoneName === undefined) return undefined
+        // "GMT" alone means UTC; otherwise "GMT+05:30" or "GMT-06:00"
+        return zoneName === 'GMT' ? 0 : parseGmtOffsetToMinutes(zoneName.slice(3))
+    } catch {
+        return undefined
+    }
+}
+
+const MINUTE_MS = 60_000
+
+/**
+ * The first moment of a YYYY-MM-DD date in `timeZone`, as `YYYY-MM-DDT00:00:00` with the
+ * offset that names it. A fixed offset such as the user's current `gmtString` is wrong
+ * for dates on the other side of a daylight-saving change, so ranges in the past or
+ * future use this. Falls back to `fallbackOffset` when the zone is missing or unknown.
+ *
+ * Some zones change their clocks at midnight. When the clocks skip midnight, the day
+ * starts at the jump, which is midnight at the offset before it. When midnight happens
+ * twice, the day starts at the first one.
+ */
+export function getStartOfDay({
+    date,
+    timeZone,
+    fallbackOffset,
+}: {
+    date: string
+    timeZone: string | null | undefined
+    fallbackOffset: string
+}): string {
+    const withOffset = (offset: string) => `${date}T00:00:00${offset}`
+    const midnightAsUtc = Date.parse(`${date}T00:00:00Z`)
+    if (!timeZone || Number.isNaN(midnightAsUtc)) return withOffset(fallbackOffset)
+
+    // Offsets run from -12:00 to +14:00, so the offsets in force 14 hours either side of
+    // midnight-as-UTC are the only ones this day's midnight can have.
+    const offsetAt = (instant: number) => getZoneOffsetMinutes(instant, timeZone)
+    const before = offsetAt(midnightAsUtc - 14 * 60 * MINUTE_MS)
+    const after = offsetAt(midnightAsUtc + 14 * 60 * MINUTE_MS)
+    if (before === undefined || after === undefined) return withOffset(fallbackOffset)
+
+    // The offsets at which midnight really happens: one, two when it happens twice, or
+    // none when the clocks skip it going forward.
+    const midnights = [...new Set([before, after])].filter(
+        (offset) => offsetAt(midnightAsUtc - offset * MINUTE_MS) === offset,
+    )
+    const offset = midnights.length > 0 ? Math.max(...midnights) : before
+    return withOffset(formatGmtOffset(offset))
+}
