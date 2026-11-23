@@ -1,4 +1,4 @@
-import { generateLabelsFilter } from './labels.js'
+import { formatLabelsForDisplay, generateLabelsFilter } from './labels.js'
 
 describe('generateLabelsFilter', () => {
     it('returns an empty string when there are no labels', () => {
@@ -26,6 +26,10 @@ describe('generateLabelsFilter', () => {
         expect(generateLabelsFilter(['@R&D'])).toBe('(@R\\&D)')
     })
 
+    it('trims whitespace around label names, which Todoist never keeps in a name', () => {
+        expect(generateLabelsFilter(['  work ', ' @R&D '])).toBe('(@work  |  @R\\&D)')
+    })
+
     it('keeps the operator between escaped labels unescaped', () => {
         expect(generateLabelsFilter(['R&D', 'Errands (car)'], 'or')).toBe(
             '(@R\\&D  |  @Errands \\(car\\))',
@@ -33,5 +37,20 @@ describe('generateLabelsFilter', () => {
         expect(generateLabelsFilter(['R&D', 'home,office'], 'and')).toBe(
             '(@R\\&D  &  @home\\,office)',
         )
+    })
+})
+
+describe('formatLabelsForDisplay', () => {
+    it('adds @ only to labels that do not already start with it', () => {
+        expect(formatLabelsForDisplay(['@work', 'personal'])).toBe('@work | @personal')
+    })
+
+    it('joins labels with the chosen operator', () => {
+        expect(formatLabelsForDisplay(['work', 'urgent'], 'and')).toBe('@work & @urgent')
+        expect(formatLabelsForDisplay(['work', 'urgent'], 'or')).toBe('@work | @urgent')
+    })
+
+    it('trims whitespace and leaves filter operators unescaped', () => {
+        expect(formatLabelsForDisplay([' R&D ', ' @Errands (car)'])).toBe('@R&D | @Errands (car)')
     })
 })

@@ -800,6 +800,31 @@ describe(`${FIND_TASKS} tool`, () => {
                 }),
             )
         })
+
+        it.each([
+            { name: 'labels only', params: {} },
+            { name: 'text search with labels', params: { searchText: 'budget' } },
+            { name: 'project with labels', params: { projectId: TEST_IDS.PROJECT_TEST } },
+        ])(
+            'should show labels given with @ only once in the summary: $name',
+            async ({ params }) => {
+                const mockTasks = [
+                    createMappedTask({ id: TEST_IDS.TASK_1, labels: ['work', 'personal'] }),
+                ]
+                mockGetTasksByFilter.mockResolvedValue({ tasks: mockTasks, nextCursor: null })
+                mockTodoistApi.getTasks.mockResolvedValue(
+                    createMockApiResponse([createMockTask({ labels: ['work', 'personal'] })]),
+                )
+
+                const result = await findTasks.execute(
+                    { ...params, limit: 10, labels: ['@work', 'personal'] },
+                    mockTodoistApi,
+                )
+
+                expect(result.textContent).toContain('labels: @work | @personal')
+                expect(result.textContent).not.toContain('@@')
+            },
+        )
     })
 
     describe('markdown content preservation', () => {

@@ -11,7 +11,7 @@ import type { TodoistTool } from '../todoist-tool.js'
 import { getTasksByFilter, normalizePaginationCursor } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import { getDateInOffset, parseGmtOffsetToMinutes, shiftDateStringByDays } from '../utils/date.js'
-import { generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
+import { formatLabelsForDisplay, generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { getDateString, previewTasks, summarizeList } from '../utils/response-builders.js'
 import { executeWithRetry } from '../utils/retry.js'
@@ -243,9 +243,7 @@ function generateTextContent({
 
     // Add label filter information
     if (args.labels && args.labels.length > 0) {
-        const labelText = args.labels
-            .map((label) => `@${label}`)
-            .join(args.labelsOperator === 'and' ? ' & ' : ' | ')
+        const labelText = formatLabelsForDisplay(args.labels, args.labelsOperator)
         filterHints.push(`labels: ${labelText}`)
     }
 

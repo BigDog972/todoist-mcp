@@ -20,14 +20,34 @@ export const LabelsSchema = {
         ),
 }
 
+/**
+ * The label name a caller meant: without surrounding whitespace, which Todoist never
+ * keeps in a name, or a leading `@`.
+ */
+function toLabelName(label: string): string {
+    const trimmed = label.trim()
+    return trimmed.startsWith('@') ? trimmed.slice(1) : trimmed
+}
+
 export function generateLabelsFilter(labels: string[] = [], labelsOperator: LabelsOperator = 'or') {
     if (labels.length === 0) return ''
     const operator = labelsOperator === 'and' ? ' & ' : ' | '
     // Add @ prefix to labels for Todoist API query, escaping characters such as
     // `&`, `(` and `,` that would otherwise be read as filter operators.
-    const prefixedLabels = labels.map(
-        (label) => `@${escapeFilterToken(label.startsWith('@') ? label.slice(1) : label)}`,
-    )
+    const prefixedLabels = labels.map((label) => `@${escapeFilterToken(toLabelName(label))}`)
     const labelStr = prefixedLabels.join(` ${operator} `)
     return `(${labelStr})`
+}
+
+/**
+ * The labels as `@name`, joined by the operator, for the summary shown to the model.
+ * Names are shown as given, without the escaping a filter query needs.
+ */
+export function formatLabelsForDisplay(
+    labels: string[],
+    labelsOperator: LabelsOperator = 'or',
+): string {
+    return labels
+        .map((label) => `@${toLabelName(label)}`)
+        .join(labelsOperator === 'and' ? ' & ' : ' | ')
 }
