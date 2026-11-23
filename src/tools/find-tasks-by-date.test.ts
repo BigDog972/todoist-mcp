@@ -637,6 +637,52 @@ describe(`${FIND_TASKS_BY_DATE} tool`, () => {
             expect(textContent).toMatchSnapshot()
         })
 
+        it('fetches the current user once for an assignee on a multi-day "today" range', async () => {
+            // 03:00 UTC on Aug 16 is 9 PM on Aug 15 for a user at -06:00, so the range only
+            // starts on Aug 15 if the user fetched for the assignee filter also sets "today".
+            mockTodoistApi.getUser.mockResolvedValue(
+                createMockUser({
+                    tzInfo: {
+                        timezone: 'America/Chicago',
+                        gmtString: '-06:00',
+                        hours: -6,
+                        minutes: 0,
+                        isDst: 0,
+                    },
+                }),
+            )
+            mockResolveUserNameToId.mockResolvedValue({
+                userId: 'user-123',
+                displayName: 'John Doe',
+                email: 'john@example.com',
+            })
+            mockGetTasksByFilter.mockResolvedValue({ tasks: [], nextCursor: null })
+            vi.useFakeTimers()
+            vi.setSystemTime(new Date('2025-08-16T03:00:00Z'))
+
+            try {
+                await findTasksByDate.execute(
+                    {
+                        startDate: 'today',
+                        daysCount: 3,
+                        limit: 50,
+                        responsibleUser: 'john@example.com',
+                    },
+                    mockTodoistApi,
+                )
+
+                expect(mockTodoistApi.getUser).toHaveBeenCalledTimes(1)
+                expect(mockGetTasksByFilter).toHaveBeenCalledWith({
+                    client: mockTodoistApi,
+                    query: '((due after: 2025-08-15 | due: 2025-08-15) & due before: 2025-08-18 | overdue) & assigned to: john@example.com',
+                    cursor: undefined,
+                    limit: 50,
+                })
+            } finally {
+                vi.useRealTimers()
+            }
+        })
+
         it('should include unassigned tasks when responsibleUser resolves to current user', async () => {
             mockResolveUserNameToId.mockResolvedValue({
                 userId: TEST_IDS.USER_ID,
