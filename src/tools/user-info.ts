@@ -16,7 +16,11 @@ const OutputSchema = {
     startDayName: z.string().describe('The name of the start day.'),
     weekStartDate: z.string().describe('The start date of the current week (YYYY-MM-DD).'),
     weekEndDate: z.string().describe('The end date of the current week (YYYY-MM-DD).'),
-    currentWeekNumber: z.number().describe('The current week number of the year.'),
+    currentWeekNumber: z
+        .number()
+        .describe(
+            'The number of the current week (weekStartDate to weekEndDate), by the ISO 8601 rule.',
+        ),
     completedToday: z.number().describe('The number of tasks completed today.'),
     dailyGoal: z.number().describe('The daily goal for task completions.'),
     weeklyGoal: z.number().describe('The weekly goal for task completions.'),
@@ -69,10 +73,21 @@ function getWeekEndDate(weekStart: Date): Date {
     return weekEnd
 }
 
-function getWeekNumber(date: Date): number {
-    const firstDayOfYear = new Date(date.getFullYear(), 0, 1)
-    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000
-    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7)
+/**
+ * The number of the week that starts on `weekStart`, by the ISO 8601 rule: a week
+ * belongs to the year that holds its fourth day, and week 1 is the first such week.
+ * For a Monday start this is the ISO week number; for any other start day the whole
+ * week shown, from start date to end date, carries one number.
+ */
+function getWeekNumber(weekStart: Date): number {
+    const fourthDay = Date.UTC(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() + 3,
+    )
+    const year = new Date(fourthDay).getUTCFullYear()
+    const dayOfYear = (fourthDay - Date.UTC(year, 0, 1)) / 86_400_000
+    return Math.floor(dayOfYear / 7) + 1
 }
 
 function getDayName(dayNumber: number): string {
@@ -135,7 +150,7 @@ async function generateUserInfo(
     const userDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }))
     const weekStart = getWeekStartDate(userDate, startDay)
     const weekEnd = getWeekEndDate(weekStart)
-    const weekNumber = getWeekNumber(userDate)
+    const weekNumber = getWeekNumber(weekStart)
 
     // Generate markdown text content
     const lines: string[] = [
