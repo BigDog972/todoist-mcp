@@ -454,4 +454,73 @@ describe(`${FIND_ACTIVITY} tool`, () => {
             expect(result.textContent).toContain(' • system')
         })
     })
+
+    describe('event times', () => {
+        function mockUserTimezone(timezone: string, gmtString: string) {
+            mockTodoistApi.getUser.mockResolvedValue(
+                createMockUser({
+                    tzInfo: { timezone, gmtString, hours: 0, minutes: 0, isDst: 0 },
+                }),
+            )
+        }
+
+        function mockEventAt(isoDate: string) {
+            mockTodoistApi.getActivityLogs.mockResolvedValue({
+                results: [createMockActivityEvent({ eventDate: new Date(isoDate) })],
+                nextCursor: null,
+            })
+        }
+
+        it("shows each event's time in the user's time zone, and says which zone", async () => {
+            mockUserTimezone('America/Chicago', '-06:00')
+            // 8:30 PM on Nov 23 in Chicago
+            mockEventAt('2026-11-24T02:30:00Z')
+
+            const result = await findActivity.execute({ limit: 20 }, mockTodoistApi)
+
+            expect(result.textContent).toContain('[Nov 23, 20:30] added task')
+            expect(result.textContent).toContain('Times are in America/Chicago.')
+        })
+
+        it('uses the offset in force on the day of each event', async () => {
+            mockUserTimezone('America/Chicago', '-06:00')
+            // 8:30 PM on Jul 4 in Chicago, on daylight saving time
+            mockEventAt('2026-07-05T01:30:00Z')
+
+            const result = await findActivity.execute({ limit: 20 }, mockTodoistApi)
+
+            expect(result.textContent).toContain('[Jul 4, 20:30] added task')
+        })
+
+        it('falls back to UTC, and says so, when the user cannot be loaded', async () => {
+            mockTodoistApi.getUser.mockRejectedValue(new Error('network down'))
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+            mockEventAt('2026-11-24T02:30:00Z')
+
+            const result = await findActivity.execute({ limit: 20 }, mockTodoistApi)
+
+            expect(result.textContent).toContain('[Nov 24, 02:30] added task')
+            expect(result.textContent).toContain('Times are in UTC.')
+            consoleError.mockRestore()
+        })
+
+        it('falls back to UTC for a time zone the runtime does not know', async () => {
+            mockUserTimezone('Not/AZone', '+05:00')
+            mockEventAt('2026-11-24T02:30:00Z')
+
+            const result = await findActivity.execute({ limit: 20 }, mockTodoistApi)
+
+            expect(result.textContent).toContain('[Nov 24, 02:30] added task')
+            expect(result.textContent).toContain('Times are in UTC.')
+        })
+
+        it('does not name a time zone when there are no events', async () => {
+            mockUserTimezone('America/Chicago', '-06:00')
+            mockTodoistApi.getActivityLogs.mockResolvedValue({ results: [], nextCursor: null })
+
+            const result = await findActivity.execute({ limit: 20 }, mockTodoistApi)
+
+            expect(result.textContent).not.toContain('Times are in')
+        })
+    })
 })
