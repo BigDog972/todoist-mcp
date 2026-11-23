@@ -180,5 +180,61 @@ describe('find-tasks-by-date timezone handling', () => {
                 vi.useRealTimers()
             }
         })
+
+        it("falls back to UTC, not the server's zone, when the user lookup fails", async () => {
+            // 03:00 UTC on Aug 16 is still Aug 15 on a server in New York.
+            process.env.TZ = 'America/New_York'
+            const lookupError = new Error('Network error')
+            mockTodoistApi.getUser.mockRejectedValue(lookupError)
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+            vi.useFakeTimers()
+            vi.setSystemTime(new Date('2025-08-16T03:00:00Z'))
+
+            try {
+                await findTasksByDate.execute(
+                    { startDate: 'today', limit: 50, daysCount: 3 },
+                    mockTodoistApi,
+                )
+
+                const call = mockGetTasksByFilter.mock.calls[0]?.[0]
+                expect(call?.query).toBe(
+                    '((due after: 2025-08-16 | due: 2025-08-16) & due before: 2025-08-19 | overdue) & !assigned to: others',
+                )
+                expect(consoleError).toHaveBeenCalledWith(
+                    "find-tasks-by-date: could not load the user's timezone, using UTC",
+                    lookupError,
+                )
+            } finally {
+                vi.useRealTimers()
+            }
+        })
+
+        it('retries a transient user lookup failure before falling back', async () => {
+            process.env.TZ = 'UTC'
+            mockTodoistApi.getUser
+                .mockRejectedValueOnce(
+                    Object.assign(new Error('Service Unavailable'), { httpStatusCode: 503 }),
+                )
+                .mockResolvedValueOnce(userAt('America/Chicago', '-06:00', -6))
+            vi.useFakeTimers()
+            vi.setSystemTime(new Date('2025-08-16T03:00:00Z'))
+
+            try {
+                const pending = findTasksByDate.execute(
+                    { startDate: 'today', limit: 50, daysCount: 3 },
+                    mockTodoistApi,
+                )
+                await vi.runAllTimersAsync()
+                await pending
+
+                expect(mockTodoistApi.getUser).toHaveBeenCalledTimes(2)
+                const call = mockGetTasksByFilter.mock.calls[0]?.[0]
+                expect(call?.query).toBe(
+                    '((due after: 2025-08-15 | due: 2025-08-15) & due before: 2025-08-18 | overdue) & !assigned to: others',
+                )
+            } finally {
+                vi.useRealTimers()
+            }
+        })
     })
 })

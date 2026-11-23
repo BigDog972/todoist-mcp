@@ -1,3 +1,4 @@
+import type { CurrentUser, TodoistApi } from '@todoist/sdk'
 import { addDays, formatISO } from 'date-fns'
 import { z } from 'zod'
 import {
@@ -13,6 +14,7 @@ import { getDateInOffset, parseGmtOffsetToMinutes, shiftDateStringByDays } from 
 import { generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { getDateString, previewTasks, summarizeList } from '../utils/response-builders.js'
+import { executeWithRetry } from '../utils/retry.js'
 import { ToolNames } from '../utils/tool-names.js'
 import { getAssigneeShortNames, SELF_USER_KEYWORD } from '../utils/user-resolver.js'
 
@@ -21,6 +23,32 @@ import { getAssigneeShortNames, SELF_USER_KEYWORD } from '../utils/user-resolver
  */
 function parseLocalDate(dateStr: string): Date {
     return new Date(`${dateStr}T00:00:00`)
+}
+
+const UTC_OFFSET = '+00:00'
+
+/**
+ * The user's GMT offset (+HH:MM), from `knownUser` when the caller already has it.
+ * A failed lookup falls back to UTC rather than failing the search, at the cost of
+ * a range that can start a day off for a user near midnight.
+ */
+async function getUserGmtOffset(
+    client: TodoistApi,
+    knownUser: CurrentUser | undefined,
+): Promise<string> {
+    if (knownUser) {
+        return knownUser.tzInfo?.gmtString || UTC_OFFSET
+    }
+    try {
+        const user = await executeWithRetry(() => client.getUser())
+        return user.tzInfo?.gmtString || UTC_OFFSET
+    } catch (error) {
+        console.error(
+            `${ToolNames.FIND_TASKS_BY_DATE}: could not load the user's timezone, using UTC`,
+            error,
+        )
+        return UTC_OFFSET
+    }
 }
 
 export const ArgsSchema = {
@@ -101,11 +129,9 @@ const findTasksByDate = {
         const resolvedAssigneeId = resolved?.userId
         const assigneeEmail = resolved?.email
         const isCurrentUserQuery = args.responsibleUser?.trim().toLowerCase() === SELF_USER_KEYWORD
-        const currentUserId = isCurrentUserQuery
-            ? resolvedAssigneeId
-            : resolvedAssigneeId
-              ? (await client.getUser()).id
-              : undefined
+        const currentUser =
+            resolvedAssigneeId && !isCurrentUserQuery ? await client.getUser() : undefined
+        const currentUserId = isCurrentUserQuery ? resolvedAssigneeId : currentUser?.id
 
         let query = ''
 
@@ -117,9 +143,8 @@ const findTasksByDate = {
                 // "Today" is the user's date in their Todoist timezone, not the server's:
                 // the hosted server runs on UTC, where it is already tomorrow for a user
                 // west of Greenwich in the evening.
-                const user = await client.getUser()
-                const offsetMinutes = parseGmtOffsetToMinutes(user.tzInfo?.gmtString || '+00:00')
-                const todayStr = getDateInOffset(new Date(), offsetMinutes)
+                const gmtOffset = await getUserGmtOffset(client, currentUser)
+                const todayStr = getDateInOffset(new Date(), parseGmtOffsetToMinutes(gmtOffset))
                 const endDateStr = shiftDateStringByDays(todayStr, args.daysCount)
                 const dateRangeQuery = `(due after: ${todayStr} | due: ${todayStr}) & due before: ${endDateStr}`
                 query =
