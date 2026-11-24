@@ -7,6 +7,7 @@ No results. No activity events match the specified filters; Note: Activity logs 
 
 exports[`find-activity tool > basic functionality > should retrieve activity events with default parameters 1`] = `
 "Activity events: 2 (limit 20).
+Times are in UTC.
 Preview:
     [Oct 23, 10:00] added task • id=task-456 • by=user-001 • project=project-789
     [Oct 23, 11:00] completed task • id=task-456 • by=user-001 • project=project-789"
@@ -15,6 +16,7 @@ Preview:
 exports[`find-activity tool > filtering > should support multiple filters simultaneously 1`] = `
 "Activity: completed tasks: 1 (limit 50).
 Filter: project: project-work; initiator: user-bob.
+Times are in UTC.
 Preview:
     [Oct 23, 10:30] completed task • id=task-456 • by=user-bob • project=project-work"
 `;

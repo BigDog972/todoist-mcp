@@ -1,10 +1,16 @@
-import { ACTIVITY_EVENT_TYPES, ACTIVITY_OBJECT_TYPES } from '@todoist/sdk'
+import {
+    ACTIVITY_EVENT_TYPES,
+    ACTIVITY_OBJECT_TYPES,
+    type CurrentUser,
+    type TodoistApi,
+} from '@todoist/sdk'
 import { z } from 'zod'
 import type { TodoistTool } from '../todoist-tool.js'
 import { mapActivityEvent } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import { ActivityEventSchema } from '../utils/output-schemas.js'
 import { summarizeList } from '../utils/response-builders.js'
+import { executeWithRetry } from '../utils/retry.js'
 import { optionalString } from '../utils/schema-helpers.js'
 import { ToolNames } from '../utils/tool-names.js'
 import { userResolver } from '../utils/user-resolver.js'
@@ -116,14 +122,25 @@ const findActivity = {
         const events = results.map(mapActivityEvent)
         // An initiator is named from the collaborators of the project the event
         // happened in; events outside a project keep the bare user ID.
+        // One lookup of the current user serves both the time zone and the
+        // collaborator cache scope, so the user is not fetched twice.
+        const user = events.length > 0 ? await getCurrentUser(client) : undefined
+        const timeZone = getTimeZone(user)
         const initiatorNames = await userResolver.getUserShortNames(
             client,
             events.flatMap((event) =>
                 event.initiatorId && event.parentProjectId ? [event.parentProjectId] : [],
             ),
+            user?.id ?? null,
         )
 
-        const textContent = generateTextContent({ events, args, nextCursor, initiatorNames })
+        const textContent = generateTextContent({
+            events,
+            args,
+            nextCursor,
+            initiatorNames,
+            timeZone,
+        })
         return {
             textContent,
             structuredContent: {
@@ -137,16 +154,54 @@ const findActivity = {
     },
 } satisfies TodoistTool<typeof ArgsSchema, typeof OutputSchema>
 
+const UTC = 'UTC'
+
+function isKnownTimeZone(timeZone: string): boolean {
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone })
+        return true
+    } catch {
+        return false
+    }
+}
+
+/**
+ * The current user, or null when the lookup fails: naming the time zone and the
+ * initiators should never fail the call.
+ */
+async function getCurrentUser(client: TodoistApi): Promise<CurrentUser | null> {
+    try {
+        return await executeWithRetry(() => client.getUser())
+    } catch (error) {
+        console.error(
+            `${ToolNames.FIND_ACTIVITY}: could not load the user's time zone, using UTC`,
+            error,
+        )
+        return null
+    }
+}
+
+/**
+ * The user's IANA time zone, for showing event times as the user's own clock read.
+ * No user or an unknown zone falls back to UTC; the text names the zone either way.
+ */
+function getTimeZone(user: CurrentUser | null | undefined): string {
+    const timeZone = user?.tzInfo?.timezone
+    return timeZone && isKnownTimeZone(timeZone) ? timeZone : UTC
+}
+
 function generateTextContent({
     events,
     args,
     nextCursor,
     initiatorNames,
+    timeZone,
 }: {
     events: ReturnType<typeof mapActivityEvent>[]
     args: z.infer<z.ZodObject<typeof ArgsSchema>>
     nextCursor: string | null
     initiatorNames: ReadonlyMap<string, string>
+    timeZone: string
 }) {
     // Generate subject description
     let subject = 'Activity events'
@@ -210,9 +265,11 @@ function generateTextContent({
         limit: args.limit,
         nextCursor: nextCursor ?? undefined,
         filterHints,
+        notes: events.length > 0 ? [`Times are in ${timeZone}.`] : undefined,
         previewLines: previewActivityEvents(
             events,
             initiatorNames,
+            timeZone,
             Math.min(events.length, args.limit),
         ),
         zeroReasonHints,
@@ -225,11 +282,12 @@ function generateTextContent({
 function previewActivityEvents(
     events: ReturnType<typeof mapActivityEvent>[],
     initiatorNames: ReadonlyMap<string, string>,
+    timeZone: string,
     limit = 10,
 ): string {
     const previewEvents = events.slice(0, limit)
     const lines = previewEvents
-        .map((event) => formatActivityEventPreview(event, initiatorNames))
+        .map((event) => formatActivityEventPreview(event, initiatorNames, timeZone))
         .join('\n')
 
     // If we're showing fewer events than the total, add an indicator
@@ -247,8 +305,9 @@ function previewActivityEvents(
 function formatActivityEventPreview(
     event: ReturnType<typeof mapActivityEvent>,
     initiatorNames: ReadonlyMap<string, string>,
+    timeZone: string,
 ): string {
-    const date = formatEventDate(event.eventDate)
+    const date = formatEventDate(event.eventDate, timeZone)
     const eventLabel = `${event.eventType} ${event.objectType}`
 
     // Extract useful content from extraData if available
@@ -275,19 +334,18 @@ function formatActivityEventPreview(
 }
 
 /**
- * Formats an ISO date string to a more readable format
+ * Formats an ISO date string as the user's clock read it, e.g. "Oct 23, 14:30"
  */
-function formatEventDate(isoDate: string): string {
+function formatEventDate(isoDate: string, timeZone: string): string {
     try {
         const date = new Date(isoDate)
-        // Format as: Oct 23, 14:30 (in UTC for deterministic snapshots)
-        const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
-        const day = date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'UTC' })
+        const month = date.toLocaleDateString('en-US', { month: 'short', timeZone })
+        const day = date.toLocaleDateString('en-US', { day: 'numeric', timeZone })
         const time = date.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
-            hour12: false,
-            timeZone: 'UTC',
+            hourCycle: 'h23',
+            timeZone,
         })
         return `${month} ${day}, ${time}`
     } catch {
