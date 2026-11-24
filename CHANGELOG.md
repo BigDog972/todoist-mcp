@@ -1,3 +1,10 @@
+## [17.3.10](https://github.com/todoist/todoist-mcp/compare/v17.3.9...v17.3.10) (2026-11-24)
+
+### Bug Fixes
+
+* **find-activity:** show event times in the user's time zone ([#757](https://github.com/todoist/todoist-mcp/issues/757)) ([9e44d1b](https://github.com/todoist/todoist-mcp/commit/9e44d1b486a45275c618ddd68bc6a224d0ee2174))
+* **user-info:** number the week that user-info shows ([#756](https://github.com/todoist/todoist-mcp/issues/756)) ([0e6f333](https://github.com/todoist/todoist-mcp/commit/0e6f333a49ea5adc01d990323082110c38a8baa3))
+
 ## [17.3.9](https://github.com/todoist/todoist-mcp/compare/v17.3.8...v17.3.9) (2026-11-24)
 
 ### Bug Fixes
