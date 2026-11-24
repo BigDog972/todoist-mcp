@@ -1,3 +1,9 @@
+## [17.3.13](https://github.com/todoist/todoist-mcp/compare/v17.3.12...v17.3.13) (2026-11-24)
+
+### Bug Fixes
+
+* **find-tasks-by-date:** name the last day a date range searches ([#762](https://github.com/todoist/todoist-mcp/issues/762)) ([3a80908](https://github.com/todoist/todoist-mcp/commit/3a809089da3e53c9ea390e6373c3a2c50f463b88))
+
 ## [17.3.12](https://github.com/todoist/todoist-mcp/compare/v17.3.11...v17.3.12) (2026-11-24)
 
 ### Bug Fixes
