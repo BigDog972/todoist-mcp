@@ -169,4 +169,94 @@ describe(`${USER_INFO} tool`, () => {
             TEST_ERRORS.API_UNAUTHORIZED,
         )
     })
+
+    describe('week number', () => {
+        afterEach(() => {
+            vi.useRealTimers()
+        })
+
+        // Noon in Chicago on each date, so the server's own time zone cannot move the day.
+        it.each([
+            {
+                name: 'a Sunday, the last day of a Monday-start week',
+                now: '2026-11-22T18:00:00Z',
+                startDay: 1,
+                expected: {
+                    currentWeekNumber: 47,
+                    weekStartDate: '2026-11-16',
+                    weekEndDate: '2026-11-22',
+                },
+            },
+            {
+                name: 'the Monday after it',
+                now: '2026-11-23T18:00:00Z',
+                startDay: 1,
+                expected: {
+                    currentWeekNumber: 48,
+                    weekStartDate: '2026-11-23',
+                    weekEndDate: '2026-11-29',
+                },
+            },
+            {
+                name: "New Year's Day in a week that belongs to the year before",
+                now: '2027-01-01T18:00:00Z',
+                startDay: 1,
+                expected: {
+                    currentWeekNumber: 53,
+                    weekStartDate: '2026-12-28',
+                    weekEndDate: '2027-01-03',
+                },
+            },
+            {
+                name: "New Year's Eve in a week that belongs to the year after",
+                now: '2024-12-31T18:00:00Z',
+                startDay: 1,
+                expected: {
+                    currentWeekNumber: 1,
+                    weekStartDate: '2024-12-30',
+                    weekEndDate: '2025-01-05',
+                },
+            },
+            {
+                name: 'the first day of a Sunday-start week',
+                now: '2026-11-22T18:00:00Z',
+                startDay: 7,
+                expected: {
+                    currentWeekNumber: 47,
+                    weekStartDate: '2026-11-22',
+                    weekEndDate: '2026-11-28',
+                },
+            },
+            {
+                name: 'the last day of the same Sunday-start week',
+                now: '2026-11-28T18:00:00Z',
+                startDay: 7,
+                expected: {
+                    currentWeekNumber: 47,
+                    weekStartDate: '2026-11-22',
+                    weekEndDate: '2026-11-28',
+                },
+            },
+        ])('numbers the week shown on $name', async ({ now, startDay, expected }) => {
+            vi.useFakeTimers({ toFake: ['Date'] })
+            vi.setSystemTime(new Date(now))
+            mockTodoistApi.getUser.mockResolvedValue(
+                createMockUser({
+                    startDay,
+                    tzInfo: {
+                        timezone: 'America/Chicago',
+                        gmtString: '-06:00',
+                        hours: -6,
+                        minutes: 0,
+                        isDst: 0,
+                    },
+                }),
+            )
+
+            const { structuredContent, textContent } = await userInfo.execute({}, mockTodoistApi)
+
+            expect(structuredContent).toEqual(expect.objectContaining(expected))
+            expect(textContent).toContain(`**Current Week:** Week ${expected.currentWeekNumber}`)
+        })
+    })
 })
