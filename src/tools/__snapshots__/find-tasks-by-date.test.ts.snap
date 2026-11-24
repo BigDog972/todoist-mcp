@@ -21,14 +21,14 @@ Preview:
 `;
 
 exports[`find-tasks-by-date tool > listing tasks by date range > should exclude overdue for today + multi-day range when exclude-overdue 1`] = `
-"Today's tasks: 1 (limit 50).
+"Tasks for Today and the next 6 days: 1 (limit 50).
 Filter: today + 6 more days.
 Preview:
     Today task • due 2025-08-15 • P4 • id=8485093748"
 `;
 
 exports[`find-tasks-by-date tool > listing tasks by date range > should get tasks for today + multi-day range when daysCount > 1 (includes overdue) 1`] = `
-"Today's tasks + overdue: 1 (limit 50).
+"Tasks for Today and the next 6 days + overdue: 1 (limit 50).
 Filter: today + overdue tasks + 6 more days.
 Preview:
     Today task • due 2025-08-15 • P4 • id=8485093748"
