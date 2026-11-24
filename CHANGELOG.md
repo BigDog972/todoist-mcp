@@ -1,3 +1,9 @@
+## [17.3.15](https://github.com/todoist/todoist-mcp/compare/v17.3.14...v17.3.15) (2026-11-24)
+
+### Bug Fixes
+
+* mark a refused token as invalid_token in the HTTP 401 challenge ([#764](https://github.com/todoist/todoist-mcp/issues/764)) ([9a12a17](https://github.com/todoist/todoist-mcp/commit/9a12a17f65e7ae5fdc92508f951a505ecf7491b8)), closes [todoist/mcp-core#18](https://github.com/todoist/mcp-core/issues/18)
+
 ## [17.3.14](https://github.com/todoist/todoist-mcp/compare/v17.3.13...v17.3.14) (2026-11-24)
 
 ### Bug Fixes
