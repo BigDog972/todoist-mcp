@@ -514,6 +514,19 @@ describe(`${FIND_ACTIVITY} tool`, () => {
             expect(result.textContent).toContain('Times are in UTC.')
         })
 
+        it('loads the current user once for both the time zone and the initiator names', async () => {
+            mockUserTimezone('America/Chicago', '-06:00')
+            mockEventAt('2026-11-24T02:30:00Z')
+
+            await findActivity.execute({ limit: 20 }, mockTodoistApi)
+
+            expect(mockTodoistApi.getUser).toHaveBeenCalledTimes(1)
+            expect(mockTodoistApi.getProjectCollaborators).toHaveBeenCalledWith(
+                'project-789',
+                expect.anything(),
+            )
+        })
+
         it('does not name a time zone when there are no events', async () => {
             mockUserTimezone('America/Chicago', '-06:00')
             mockTodoistApi.getActivityLogs.mockResolvedValue({ results: [], nextCursor: null })

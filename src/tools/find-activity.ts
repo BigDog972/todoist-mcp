@@ -1,4 +1,9 @@
-import { ACTIVITY_EVENT_TYPES, ACTIVITY_OBJECT_TYPES, type TodoistApi } from '@todoist/sdk'
+import {
+    ACTIVITY_EVENT_TYPES,
+    ACTIVITY_OBJECT_TYPES,
+    type CurrentUser,
+    type TodoistApi,
+} from '@todoist/sdk'
 import { z } from 'zod'
 import type { TodoistTool } from '../todoist-tool.js'
 import { mapActivityEvent } from '../tool-helpers.js'
@@ -117,15 +122,17 @@ const findActivity = {
         const events = results.map(mapActivityEvent)
         // An initiator is named from the collaborators of the project the event
         // happened in; events outside a project keep the bare user ID.
-        const [initiatorNames, timeZone] = await Promise.all([
-            userResolver.getUserShortNames(
-                client,
-                events.flatMap((event) =>
-                    event.initiatorId && event.parentProjectId ? [event.parentProjectId] : [],
-                ),
+        // One lookup of the current user serves both the time zone and the
+        // collaborator cache scope, so the user is not fetched twice.
+        const user = events.length > 0 ? await getCurrentUser(client) : undefined
+        const timeZone = getTimeZone(user)
+        const initiatorNames = await userResolver.getUserShortNames(
+            client,
+            events.flatMap((event) =>
+                event.initiatorId && event.parentProjectId ? [event.parentProjectId] : [],
             ),
-            events.length > 0 ? getUserTimeZone(client) : UTC,
-        ])
+            user === undefined ? undefined : (user?.id ?? null),
+        )
 
         const textContent = generateTextContent({
             events,
@@ -159,22 +166,28 @@ function isKnownTimeZone(timeZone: string): boolean {
 }
 
 /**
- * The user's IANA time zone, for showing event times as the user's own clock read.
- * A failed lookup or an unknown zone falls back to UTC rather than failing the call;
- * the text names the zone either way.
+ * The current user, or null when the lookup fails: naming the time zone and the
+ * initiators should never fail the call.
  */
-async function getUserTimeZone(client: TodoistApi): Promise<string> {
+async function getCurrentUser(client: TodoistApi): Promise<CurrentUser | null> {
     try {
-        const user = await executeWithRetry(() => client.getUser())
-        const timeZone = user.tzInfo?.timezone
-        return timeZone && isKnownTimeZone(timeZone) ? timeZone : UTC
+        return await executeWithRetry(() => client.getUser())
     } catch (error) {
         console.error(
             `${ToolNames.FIND_ACTIVITY}: could not load the user's time zone, using UTC`,
             error,
         )
-        return UTC
+        return null
     }
+}
+
+/**
+ * The user's IANA time zone, for showing event times as the user's own clock read.
+ * No user or an unknown zone falls back to UTC; the text names the zone either way.
+ */
+function getTimeZone(user: CurrentUser | null | undefined): string {
+    const timeZone = user?.tzInfo?.timezone
+    return timeZone && isKnownTimeZone(timeZone) ? timeZone : UTC
 }
 
 function generateTextContent({
