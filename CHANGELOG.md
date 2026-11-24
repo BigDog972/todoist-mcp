@@ -1,3 +1,9 @@
+## [17.3.12](https://github.com/todoist/todoist-mcp/compare/v17.3.11...v17.3.12) (2026-11-24)
+
+### Bug Fixes
+
+* **user-resolver:** name the people an ambiguous reference fits ([#761](https://github.com/todoist/todoist-mcp/issues/761)) ([cc5c02d](https://github.com/todoist/todoist-mcp/commit/cc5c02d8a650026965069b7f06c283da25d5b8cd))
+
 ## [17.3.11](https://github.com/todoist/todoist-mcp/compare/v17.3.10...v17.3.11) (2026-11-24)
 
 ### Bug Fixes
