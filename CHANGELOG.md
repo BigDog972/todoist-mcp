@@ -1,3 +1,9 @@
+## [17.3.11](https://github.com/todoist/todoist-mcp/compare/v17.3.10...v17.3.11) (2026-11-24)
+
+### Bug Fixes
+
+* **user-resolver:** do not guess between people a partial name fits ([#760](https://github.com/todoist/todoist-mcp/issues/760)) ([46bb9a7](https://github.com/todoist/todoist-mcp/commit/46bb9a79be442567da4ef400b23763a89c4eadf3))
+
 ## [17.3.10](https://github.com/todoist/todoist-mcp/compare/v17.3.9...v17.3.10) (2026-11-24)
 
 ### Bug Fixes
