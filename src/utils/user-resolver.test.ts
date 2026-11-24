@@ -1,5 +1,8 @@
 import type { TodoistApi } from '@todoist/sdk'
 import { type Mocked, vi } from 'vitest'
+import { AmbiguousUserError } from '../tool-execution-error.js'
+import { logBatchFailures } from './batch-failures.js'
+import { ToolNames } from './tool-names.js'
 import {
     BoundedTtlCache,
     getAssigneeShortNames,
@@ -468,22 +471,62 @@ describe('UserResolver', () => {
                 })
             })
 
-            it('does not guess between two people whose names contain it', async () => {
+            it('names the people a partial name fits instead of guessing between them', async () => {
                 mockCollaborators([
                     { id: 'u1', name: 'Joanne Smith', email: 'joanne@example.com' },
                     { id: 'u2', name: 'Ann Lee', email: 'ann@example.com' },
                 ])
 
-                await expect(resolver.resolveUser(mockClient, 'Ann')).resolves.toBeNull()
+                await expect(resolver.resolveUser(mockClient, 'Ann')).rejects.toThrow(
+                    '"Ann" matches 2 people: "Joanne Smith" (ID u1), "Ann Lee" (ID u2). Retry with the ID of the one you mean.',
+                )
             })
 
-            it('does not guess between two people whose emails contain it', async () => {
+            it('names the people a partial email fits, without their emails', async () => {
                 mockCollaborators([
                     { id: 'u1', name: 'Joanne Smith', email: 'j.smith@example.com' },
                     { id: 'u2', name: 'Kim Smith', email: 'k.smith@example.com' },
                 ])
 
-                await expect(resolver.resolveUser(mockClient, 'smith@')).resolves.toBeNull()
+                await expect(resolver.resolveUser(mockClient, 'smith@')).rejects.toThrow(
+                    '"smith@" matches 2 people: "Joanne Smith" (ID u1), "Kim Smith" (ID u2). Retry with the ID of the one you mean.',
+                )
+            })
+
+            it('names the first five people a partial name fits and counts the rest', async () => {
+                mockCollaborators(
+                    ['Ada', 'Bo', 'Cy', 'Di', 'Ed', 'Flo', 'Gus'].map((first, index) => ({
+                        id: `u${index + 1}`,
+                        name: `${first} Smith`,
+                        email: `${first.toLowerCase()}@example.com`,
+                    })),
+                )
+
+                await expect(resolver.resolveUser(mockClient, 'Smith')).rejects.toThrow(
+                    '"Smith" matches 7 people: "Ada Smith" (ID u1), "Bo Smith" (ID u2), "Cy Smith" (ID u3), "Di Smith" (ID u4), "Ed Smith" (ID u5) and 2 more. Retry with the ID of the one you mean, or search for them with find-project-collaborators.',
+                )
+            })
+
+            it('keeps every name redactable in the batch failure log, double quotes included', async () => {
+                mockCollaborators([
+                    { id: 'u1', name: 'Ann "Annie" Lee', email: 'annie@example.com' },
+                    { id: 'u2', name: 'Ann "Anita" Kim', email: 'anita@example.com' },
+                ])
+                const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+                const error = await resolver.resolveUser(mockClient, 'Ann "').catch((e) => e)
+                logBatchFailures(ToolNames.ADD_TASKS, 1, [
+                    { item: 'task-1', error: (error as Error).message },
+                ])
+
+                expect(consoleError.mock.calls[0]?.[1]).toMatchObject({
+                    sample: [
+                        {
+                            error: '"[redacted]" matches 2 people: "[redacted]" (ID u1), "[redacted]" (ID u2). Retry with the ID of the one you mean.',
+                        },
+                    ],
+                })
+                consoleError.mockRestore()
             })
 
             it('still prefers an exact name over partial matches', async () => {
@@ -563,6 +606,21 @@ describe('resolveUserRefs', () => {
         ).rejects.toThrow(
             'Could not find user(s): "Ghost", "Phantom". Make sure they are collaborators on a shared project.',
         )
+    })
+
+    it('names the people an ambiguous reference fits alongside the ones nobody matches', async () => {
+        mockClient.getProjectCollaborators.mockResolvedValue({
+            results: [...collaborators, { id: '333', name: 'Ana Bell', email: 'bell@example.com' }],
+            nextCursor: null,
+        } as unknown as Awaited<ReturnType<TodoistApi['getProjectCollaborators']>>)
+
+        const lookup = resolveUserRefs(mockClient, ['Ana', 'Ghost'])
+
+        await expect(lookup).rejects.toThrow(
+            'Could not find user(s): "Ghost". Make sure they are collaborators on a shared project. "Ana" matches 2 people: "Ana Lovelace" (ID 111), "Ana Bell" (ID 333). Retry with the ID of the one you mean.',
+        )
+        // Its type keeps batch tools from cutting the candidates short.
+        await expect(lookup).rejects.toBeInstanceOf(AmbiguousUserError)
     })
 
     it('resolves nothing for an empty list', async () => {
