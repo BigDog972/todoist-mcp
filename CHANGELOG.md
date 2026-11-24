@@ -1,3 +1,9 @@
+## [17.3.14](https://github.com/todoist/todoist-mcp/compare/v17.3.13...v17.3.14) (2026-11-24)
+
+### Bug Fixes
+
+* **mcp-apps:** name the days the task list covers in its title ([#763](https://github.com/todoist/todoist-mcp/issues/763)) ([c5347e3](https://github.com/todoist/todoist-mcp/commit/c5347e38813ebceadc1a465d7120ac1308fa2955))
+
 ## [17.3.13](https://github.com/todoist/todoist-mcp/compare/v17.3.12...v17.3.13) (2026-11-24)
 
 ### Bug Fixes
