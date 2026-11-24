@@ -443,6 +443,61 @@ describe('UserResolver', () => {
             })
         })
 
+        describe('partial names', () => {
+            function mockCollaborators(
+                collaborators: { id: string; name: string; email: string }[],
+            ) {
+                mockClient.getProjects.mockResolvedValue({
+                    results: [{ id: 'project-1', isShared: true }],
+                    nextCursor: null,
+                } as unknown as Awaited<ReturnType<TodoistApi['getProjects']>>)
+                mockClient.getProjectCollaborators = vi.fn().mockResolvedValue({
+                    results: collaborators,
+                    nextCursor: null,
+                }) as unknown as typeof mockClient.getProjectCollaborators
+            }
+
+            it('resolves a partial name that only one person has', async () => {
+                mockCollaborators([
+                    { id: 'u1', name: 'Joanne Smith', email: 'joanne@example.com' },
+                    { id: 'u2', name: 'Bo Lee', email: 'bo@example.com' },
+                ])
+
+                await expect(resolver.resolveUser(mockClient, 'Joanne')).resolves.toMatchObject({
+                    userId: 'u1',
+                })
+            })
+
+            it('does not guess between two people whose names contain it', async () => {
+                mockCollaborators([
+                    { id: 'u1', name: 'Joanne Smith', email: 'joanne@example.com' },
+                    { id: 'u2', name: 'Ann Lee', email: 'ann@example.com' },
+                ])
+
+                await expect(resolver.resolveUser(mockClient, 'Ann')).resolves.toBeNull()
+            })
+
+            it('does not guess between two people whose emails contain it', async () => {
+                mockCollaborators([
+                    { id: 'u1', name: 'Joanne Smith', email: 'j.smith@example.com' },
+                    { id: 'u2', name: 'Kim Smith', email: 'k.smith@example.com' },
+                ])
+
+                await expect(resolver.resolveUser(mockClient, 'smith@')).resolves.toBeNull()
+            })
+
+            it('still prefers an exact name over partial matches', async () => {
+                mockCollaborators([
+                    { id: 'u1', name: 'Joanne Smith', email: 'joanne@example.com' },
+                    { id: 'u2', name: 'Ann', email: 'ann@example.com' },
+                ])
+
+                await expect(resolver.resolveUser(mockClient, 'ann')).resolves.toMatchObject({
+                    userId: 'u2',
+                })
+            })
+        })
+
         it('resolves users without caching when the authenticated identity is unavailable', async () => {
             mockClient.getUser.mockRejectedValue(new Error('Auth unavailable'))
             mockClient.getProjects = vi.fn().mockResolvedValue({

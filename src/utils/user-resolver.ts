@@ -140,8 +140,10 @@ function isUserIdLike(input: string): boolean {
 
 /**
  * Finds the collaborator a reference names: an exact ID, then (unless it looks
- * like an ID) an exact name, an exact email and, with `partial`, a name or email
- * that contains it. Names and emails match case-insensitively.
+ * like an ID) an exact name, an exact email and, with `partial`, the one person
+ * whose name or email contains it. Names and emails match case-insensitively.
+ * A partial match that fits more than one person resolves to nobody, so "Ann"
+ * never quietly picks "Joanne" over "Ann Lee".
  */
 function findCollaborator(
     collaborators: ProjectCollaborator[],
@@ -158,10 +160,28 @@ function findCollaborator(
         collaborators.find((c) => c.name.toLowerCase() === searchTerm) ??
         collaborators.find((c) => c.email.toLowerCase() === searchTerm) ??
         (partial
-            ? (collaborators.find((c) => c.name.toLowerCase().includes(searchTerm)) ??
-              collaborators.find((c) => c.email.toLowerCase().includes(searchTerm)))
+            ? onlyMatch(
+                  collaborators,
+                  (c) => c.name.toLowerCase().includes(searchTerm),
+                  () => onlyMatch(collaborators, (c) => c.email.toLowerCase().includes(searchTerm)),
+              )
             : undefined)
     )
+}
+
+/**
+ * The one collaborator that `matches`, counting a person once however many
+ * projects they share. No match falls through to `otherwise`; more than one
+ * person is ambiguous and resolves to nobody.
+ */
+function onlyMatch(
+    collaborators: ProjectCollaborator[],
+    matches: (collaborator: ProjectCollaborator) => boolean,
+    otherwise: () => ProjectCollaborator | undefined = () => undefined,
+): ProjectCollaborator | undefined {
+    const found = new Map(collaborators.filter(matches).map((c) => [c.id, c]))
+    if (found.size === 0) return otherwise()
+    return found.size === 1 ? [...found.values()][0] : undefined
 }
 
 function toResolvedUser(collaborator: ProjectCollaborator): ResolvedUser {
