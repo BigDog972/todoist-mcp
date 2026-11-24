@@ -131,7 +131,7 @@ const findActivity = {
             events.flatMap((event) =>
                 event.initiatorId && event.parentProjectId ? [event.parentProjectId] : [],
             ),
-            user === undefined ? undefined : (user?.id ?? null),
+            user?.id ?? null,
         )
 
         const textContent = generateTextContent({
