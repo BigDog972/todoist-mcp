@@ -517,8 +517,11 @@ describe(`${FIND_ACTIVITY} tool`, () => {
         it('loads the current user once for both the time zone and the initiator names', async () => {
             mockUserTimezone('America/Chicago', '-06:00')
             mockEventAt('2026-11-24T02:30:00Z')
+            // The resolver remembers each client's user ID beyond clearCache(), so a
+            // client it has already seen would skip the second lookup and hide one.
+            const unseenClient = { ...mockTodoistApi } as typeof mockTodoistApi
 
-            await findActivity.execute({ limit: 20 }, mockTodoistApi)
+            await findActivity.execute({ limit: 20 }, unseenClient)
 
             expect(mockTodoistApi.getUser).toHaveBeenCalledTimes(1)
             expect(mockTodoistApi.getProjectCollaborators).toHaveBeenCalledWith(
