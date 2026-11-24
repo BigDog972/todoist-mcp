@@ -1,3 +1,9 @@
+## [17.3.9](https://github.com/todoist/todoist-mcp/compare/v17.3.8...v17.3.9) (2026-11-24)
+
+### Bug Fixes
+
+* **deps:** update dompurify, refresh the lock file and unblock Renovate ([#758](https://github.com/todoist/todoist-mcp/issues/758)) ([0e7c7cb](https://github.com/todoist/todoist-mcp/commit/0e7c7cbf999ac388d821ebbbdfa17a595524a58e))
+
 ## [17.3.8](https://github.com/todoist/todoist-mcp/compare/v17.3.7...v17.3.8) (2026-11-23)
 
 ### Bug Fixes
