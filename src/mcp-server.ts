@@ -143,7 +143,7 @@ function getMcpServer({
             description: productivityAnalysis.description,
             argsSchema: productivityAnalysis.argsSchema,
         },
-        productivityAnalysis.callback,
+        (args) => productivityAnalysis.callback(args, todoist),
     )
 
     return server

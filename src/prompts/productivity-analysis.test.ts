@@ -1,5 +1,18 @@
 import type { GetPromptResult } from '@modelcontextprotocol/server'
+import type { TodoistApi } from '@todoist/sdk'
+import { type Mocked, vi } from 'vitest'
+import { createMockUser } from '../utils/test-helpers.js'
 import { buildPromptText, computeDateRange, productivityAnalysis } from './productivity-analysis.js'
+
+const mockTodoistApi = {
+    getUser: vi.fn(),
+} as unknown as Mocked<TodoistApi>
+
+function userWithOffset(gmtString: string, timezone: string) {
+    return createMockUser({
+        tzInfo: { timezone, gmtString, hours: 0, minutes: 0, isDst: 0 },
+    })
+}
 
 function getPromptText(result: GetPromptResult): string {
     // oxlint-disable-next-line no-unsafe-optional-chaining -- test helper, messages always present
@@ -16,22 +29,32 @@ describe('productivity-analysis prompt', () => {
     })
 
     describe('callback', () => {
-        it('should return a valid GetPromptResult with a user message', () => {
-            const result = productivityAnalysis.callback({
-                period: '7d',
-                focus: 'overall',
-            })
+        beforeEach(() => {
+            mockTodoistApi.getUser.mockResolvedValue(userWithOffset('+00:00', 'UTC'))
+        })
+
+        it('should return a valid GetPromptResult with a user message', async () => {
+            const result = await productivityAnalysis.callback(
+                {
+                    period: '7d',
+                    focus: 'overall',
+                },
+                mockTodoistApi,
+            )
 
             expect(result.messages).toHaveLength(1)
             expect(result.messages[0]?.role).toBe('user')
             expect(result.messages[0]?.content.type).toBe('text')
         })
 
-        it('should include tool instructions in the prompt text', () => {
-            const result = productivityAnalysis.callback({
-                period: '7d',
-                focus: 'overall',
-            })
+        it('should include tool instructions in the prompt text', async () => {
+            const result = await productivityAnalysis.callback(
+                {
+                    period: '7d',
+                    focus: 'overall',
+                },
+                mockTodoistApi,
+            )
 
             const text = getPromptText(result)
             expect(text).toContain('user-info')
@@ -40,23 +63,29 @@ describe('productivity-analysis prompt', () => {
             expect(text).toContain('get-overview')
         })
 
-        it('should include projectId scope when provided', () => {
-            const result = productivityAnalysis.callback({
-                period: '7d',
-                focus: 'overall',
-                projectId: 'proj123',
-            })
+        it('should include projectId scope when provided', async () => {
+            const result = await productivityAnalysis.callback(
+                {
+                    period: '7d',
+                    focus: 'overall',
+                    projectId: 'proj123',
+                },
+                mockTodoistApi,
+            )
 
             const text = getPromptText(result)
             expect(text).toContain('proj123')
             expect(text).toContain('Scope this analysis to project ID: proj123')
         })
 
-        it('should not include projectId text when not provided', () => {
-            const result = productivityAnalysis.callback({
-                period: '7d',
-                focus: 'overall',
-            })
+        it('should not include projectId text when not provided', async () => {
+            const result = await productivityAnalysis.callback(
+                {
+                    period: '7d',
+                    focus: 'overall',
+                },
+                mockTodoistApi,
+            )
 
             const text = getPromptText(result)
             expect(text).not.toContain('Scope this analysis to project ID')
@@ -122,6 +151,66 @@ describe('productivity-analysis prompt', () => {
                 }
             },
         )
+    })
+
+    describe("dates on the user's own calendar", () => {
+        beforeEach(() => {
+            vi.useFakeTimers()
+            vi.spyOn(console, 'error').mockImplementation(() => {})
+        })
+
+        afterEach(() => {
+            vi.useRealTimers()
+            vi.restoreAllMocks()
+        })
+
+        it.each([
+            {
+                name: 'west of UTC in the evening, when UTC is already tomorrow',
+                now: '2026-11-25T02:00:00Z', // 8 PM Nov 24 in Chicago
+                gmtString: '-06:00',
+                timezone: 'America/Chicago',
+                since: '2026-11-18',
+                until: '2026-11-24',
+            },
+            {
+                name: 'east of UTC in the morning, when UTC is still yesterday',
+                now: '2026-11-24T20:00:00Z', // 9 AM Nov 25 in Auckland
+                gmtString: '+13:00',
+                timezone: 'Pacific/Auckland',
+                since: '2026-11-19',
+                until: '2026-11-25',
+            },
+        ])("ends the last 7 days on the user's today $name", async (scenario) => {
+            vi.setSystemTime(new Date(scenario.now))
+            mockTodoistApi.getUser.mockResolvedValue(
+                userWithOffset(scenario.gmtString, scenario.timezone),
+            )
+
+            const text = getPromptText(
+                await productivityAnalysis.callback(
+                    { period: '7d', focus: 'overall' },
+                    mockTodoistApi,
+                ),
+            )
+
+            expect(text).toContain(`(${scenario.since} to ${scenario.until})`)
+            expect(text).toContain(`since: "${scenario.since}", until: "${scenario.until}"`)
+        })
+
+        it('falls back to UTC dates when the user cannot be loaded', async () => {
+            vi.setSystemTime(new Date('2026-11-25T02:00:00Z'))
+            mockTodoistApi.getUser.mockRejectedValue(new Error('network down'))
+
+            const text = getPromptText(
+                await productivityAnalysis.callback(
+                    { period: 'today', focus: 'goals' },
+                    mockTodoistApi,
+                ),
+            )
+
+            expect(text).toContain('(2026-11-25 to 2026-11-25)')
+        })
     })
 
     describe('computeDateRange', () => {
@@ -192,6 +281,22 @@ describe('productivity-analysis prompt', () => {
                 expect(range.since).toBe(since)
                 expect(range.until).toBe(until)
                 expect(range.periodDescription).toContain(descriptionContains)
+            },
+        )
+
+        it.each([
+            { period: 'today' as const, since: '2026-03-16', until: '2026-03-16' },
+            { period: '7d' as const, since: '2026-03-10', until: '2026-03-16' },
+            { period: 'this-week' as const, since: '2026-03-16', until: '2026-03-16' },
+            { period: 'this-month' as const, since: '2026-03-01', until: '2026-03-16' },
+        ])(
+            'should count "$period" from the date in the given offset',
+            ({ period, since, until }) => {
+                // 11 PM Monday March 16 in Chicago (UTC-5), already Tuesday in UTC
+                const range = computeDateRange(period, new Date('2026-03-17T04:00:00Z'), -300)
+
+                expect(range.since).toBe(since)
+                expect(range.until).toBe(until)
             },
         )
 

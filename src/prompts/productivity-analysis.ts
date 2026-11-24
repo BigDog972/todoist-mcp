@@ -1,5 +1,8 @@
 import type { GetPromptResult } from '@modelcontextprotocol/server'
+import type { TodoistApi } from '@todoist/sdk'
 import { z } from 'zod'
+import { getDateInOffset, parseGmtOffsetToMinutes, shiftDateStringByDays } from '../utils/date.js'
+import { executeWithRetry } from '../utils/retry.js'
 
 const argsSchema = z.object({
     period: z
@@ -24,68 +27,62 @@ type PromptArgs = z.infer<typeof argsSchema>
 
 /**
  * Compute the date range (since/until as YYYY-MM-DD) for a given period.
- * Uses UTC since the prompt instructs the LLM to call user-info for timezone.
+ * "Today" is the date at `offsetMinutes` from UTC, which the prompt callback sets to
+ * the user's Todoist timezone, so the range follows the user's calendar rather than
+ * the server's. The arithmetic runs on UTC calendar dates, so the server's own
+ * timezone and daylight-saving changes cannot move a day.
  */
 function computeDateRange(
     period: PromptArgs['period'],
     now: Date = new Date(),
+    offsetMinutes = 0,
 ): { since: string; until: string; periodDescription: string } {
-    const formatDate = (d: Date): string => d.toISOString().slice(0, 10)
-    const until = formatDate(now)
+    const until = getDateInOffset(now, offsetMinutes)
+    const daysBefore = (days: number) => shiftDateStringByDays(until, -days)
 
     switch (period) {
         case 'today':
             return { since: until, until, periodDescription: 'today' }
 
-        case '7d': {
-            const since = new Date(now)
-            since.setDate(since.getDate() - 6)
-            return {
-                since: formatDate(since),
-                until,
-                periodDescription: 'the last 7 days',
-            }
-        }
+        case '7d':
+            return { since: daysBefore(6), until, periodDescription: 'the last 7 days' }
 
-        case '14d': {
-            const since = new Date(now)
-            since.setDate(since.getDate() - 13)
-            return {
-                since: formatDate(since),
-                until,
-                periodDescription: 'the last 14 days',
-            }
-        }
+        case '14d':
+            return { since: daysBefore(13), until, periodDescription: 'the last 14 days' }
 
-        case '30d': {
-            const since = new Date(now)
-            since.setDate(since.getDate() - 29)
-            return {
-                since: formatDate(since),
-                until,
-                periodDescription: 'the last 30 days',
-            }
-        }
+        case '30d':
+            return { since: daysBefore(29), until, periodDescription: 'the last 30 days' }
 
         case 'this-week': {
-            const dayOfWeek = now.getUTCDay()
-            const monday = new Date(now)
-            monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7))
+            const dayOfWeek = new Date(`${until}T00:00:00Z`).getUTCDay()
             return {
-                since: formatDate(monday),
+                since: daysBefore((dayOfWeek + 6) % 7),
                 until,
                 periodDescription: 'this week (Monday to today)',
             }
         }
 
-        case 'this-month': {
-            const firstOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+        case 'this-month':
             return {
-                since: formatDate(firstOfMonth),
+                since: `${until.slice(0, 8)}01`,
                 until,
                 periodDescription: 'this month',
             }
-        }
+    }
+}
+
+/**
+ * The user's offset from UTC in minutes, from their Todoist timezone. A failed lookup
+ * falls back to UTC rather than failing the prompt, at the cost of a range that can
+ * be a day off for a user near midnight.
+ */
+async function getUserOffsetMinutes(client: TodoistApi): Promise<number> {
+    try {
+        const user = await executeWithRetry(() => client.getUser())
+        return parseGmtOffsetToMinutes(user.tzInfo?.gmtString || '+00:00')
+    } catch (error) {
+        console.error("productivity-analysis: could not load the user's timezone, using UTC", error)
+        return 0
     }
 }
 
@@ -127,8 +124,11 @@ function buildFocusSections(focus: PromptArgs['focus']): string {
     return sections[focus] ?? ''
 }
 
-function buildPromptText(args: PromptArgs): string {
-    const { since, until, periodDescription } = computeDateRange(args.period)
+function buildPromptText(
+    args: PromptArgs,
+    range: ReturnType<typeof computeDateRange> = computeDateRange(args.period),
+): string {
+    const { since, until, periodDescription } = range
     const projectScope = args.projectId
         ? `\nScope this analysis to project ID: ${args.projectId}. Pass this projectId when calling find-completed-tasks and get-overview.`
         : ''
@@ -163,14 +163,15 @@ Present the analysis as a clear, well-structured markdown report with:
 - Actionable takeaways highlighted clearly`
 }
 
-function callback(args: PromptArgs): GetPromptResult {
+async function callback(args: PromptArgs, client: TodoistApi): Promise<GetPromptResult> {
+    const range = computeDateRange(args.period, new Date(), await getUserOffsetMinutes(client))
     return {
         messages: [
             {
                 role: 'user',
                 content: {
                     type: 'text',
-                    text: buildPromptText(args),
+                    text: buildPromptText(args, range),
                 },
             },
         ],
