@@ -13,7 +13,7 @@ import { ApiLimits } from '../utils/constants.js'
 import { getDateInOffset, parseGmtOffsetToMinutes, shiftDateStringByDays } from '../utils/date.js'
 import { formatLabelsForDisplay, generateLabelsFilter, LabelsSchema } from '../utils/labels.js'
 import { TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
-import { getDateString, previewTasks, summarizeList } from '../utils/response-builders.js'
+import { previewTasks, summarizeList } from '../utils/response-builders.js'
 import { executeWithRetry } from '../utils/retry.js'
 import { ToolNames } from '../utils/tool-names.js'
 import { getAssigneeShortNames, SELF_USER_KEYWORD } from '../utils/user-resolver.js'
@@ -234,11 +234,7 @@ function generateTextContent({
             `today${overdueText}${args.daysCount > 1 ? ` + ${args.daysCount - 1} more days` : ''}`,
         )
     } else if (args.startDate) {
-        const dateRange =
-            args.daysCount > 1
-                ? ` to ${getDateString(addDays(parseLocalDate(args.startDate), args.daysCount))}`
-                : ''
-        filterHints.push(`${args.startDate}${dateRange}`)
+        filterHints.push(describeDateRange(args.startDate, args.daysCount))
     }
 
     // Add label filter information
@@ -261,7 +257,7 @@ function generateTextContent({
         subject =
             args.overdueOption === 'exclude-overdue' ? `Today's tasks` : `Today's tasks + overdue`
     } else if (args.startDate) {
-        subject = `Tasks for ${args.startDate}`
+        subject = `Tasks for ${describeDateRange(args.startDate, args.daysCount)}`
     } else {
         subject = 'Tasks'
     }
@@ -295,6 +291,17 @@ function generateTextContent({
         previewLines: previewTasks(tasks, Math.min(tasks.length, args.limit), assigneeNames),
         zeroReasonHints,
     })
+}
+
+/**
+ * The days a specific-date search covers, as "YYYY-MM-DD" or "YYYY-MM-DD to
+ * YYYY-MM-DD". The query stops before the day after the range, so the last day
+ * named is `daysCount - 1` days after the start.
+ */
+function describeDateRange(startDate: string, daysCount: number): string {
+    return daysCount > 1
+        ? `${startDate} to ${shiftDateStringByDays(startDate, daysCount - 1)}`
+        : startDate
 }
 
 export { findTasksByDate }

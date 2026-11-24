@@ -210,6 +210,54 @@ describe(`${FIND_TASKS_BY_DATE} tool`, () => {
         })
     })
 
+    describe('summary of a date range', () => {
+        it.each([
+            {
+                name: 'a three-day range',
+                startDate: '2025-08-20',
+                daysCount: 3,
+                dayAfter: '2025-08-23',
+                heading: 'Tasks for 2025-08-20 to 2025-08-22:',
+                filter: 'Filter: 2025-08-20 to 2025-08-22.',
+            },
+            {
+                name: 'a range across the end of a month',
+                startDate: '2025-08-30',
+                daysCount: 3,
+                dayAfter: '2025-09-02',
+                heading: 'Tasks for 2025-08-30 to 2025-09-01:',
+                filter: 'Filter: 2025-08-30 to 2025-09-01.',
+            },
+            {
+                name: 'a single day',
+                startDate: '2025-08-20',
+                daysCount: 1,
+                dayAfter: '2025-08-21',
+                heading: 'Tasks for 2025-08-20:',
+                filter: 'Filter: 2025-08-20.',
+            },
+        ])(
+            'names the last day searched for $name',
+            async ({ startDate, daysCount, dayAfter, heading, filter }) => {
+                mockGetTasksByFilter.mockResolvedValue({ tasks: [], nextCursor: null })
+
+                const result = await findTasksByDate.execute(
+                    { startDate, daysCount, limit: 50 },
+                    mockTodoistApi,
+                )
+
+                // The query stops before the day after the range, which it leaves out.
+                expect(mockGetTasksByFilter).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        query: expect.stringContaining(`due before: ${dayAfter}`),
+                    }),
+                )
+                expect(result.textContent).toContain(heading)
+                expect(result.textContent).toContain(filter)
+            },
+        )
+    })
+
     describe('pagination and limits', () => {
         it.each([
             {
