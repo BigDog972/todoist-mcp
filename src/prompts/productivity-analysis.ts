@@ -25,17 +25,23 @@ const argsSchema = z.object({
 
 type PromptArgs = z.infer<typeof argsSchema>
 
+const MONDAY = 1
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
 /**
  * Compute the date range (since/until as YYYY-MM-DD) for a given period.
  * "Today" is the date at `offsetMinutes` from UTC, which the prompt callback sets to
  * the user's Todoist timezone, so the range follows the user's calendar rather than
  * the server's. The arithmetic runs on UTC calendar dates, so the server's own
- * timezone and daylight-saving changes cannot move a day.
+ * timezone and daylight-saving changes cannot move a day. "This week" starts on
+ * `weekStartDay` (1 = Monday, 7 = Sunday), the user's own setting; any other value
+ * starts it on Monday.
  */
 function computeDateRange(
     period: PromptArgs['period'],
     now: Date = new Date(),
     offsetMinutes = 0,
+    weekStartDay = MONDAY,
 ): { since: string; until: string; periodDescription: string } {
     const until = getDateInOffset(now, offsetMinutes)
     const daysBefore = (days: number) => shiftDateStringByDays(until, -days)
@@ -54,11 +60,13 @@ function computeDateRange(
             return { since: daysBefore(29), until, periodDescription: 'the last 30 days' }
 
         case 'this-week': {
-            const dayOfWeek = new Date(`${until}T00:00:00Z`).getUTCDay()
+            // Both days counted 1 (Monday) to 7 (Sunday), as Todoist numbers its start day.
+            const startDay = isWeekDay(weekStartDay) ? weekStartDay : MONDAY
+            const dayOfWeek = new Date(`${until}T00:00:00Z`).getUTCDay() || 7
             return {
-                since: daysBefore((dayOfWeek + 6) % 7),
+                since: daysBefore((dayOfWeek - startDay + 7) % 7),
                 until,
-                periodDescription: 'this week (Monday to today)',
+                periodDescription: `this week (${DAY_NAMES[startDay - 1]} to today)`,
             }
         }
 
@@ -72,18 +80,31 @@ function computeDateRange(
 }
 
 /**
- * The user's offset from UTC in minutes, from their Todoist timezone. A failed lookup
- * falls back to UTC rather than failing the prompt, at the cost of a range that can
- * be a day off for a user near midnight.
+ * The user's calendar: their offset from UTC in minutes, from their Todoist timezone,
+ * and the day their week starts on (1 = Monday, 7 = Sunday). A failed lookup falls
+ * back to UTC and Monday rather than failing the prompt, at the cost of a range that
+ * can be a day off for a user near midnight.
  */
-async function getUserOffsetMinutes(client: TodoistApi): Promise<number> {
+async function getUserCalendar(
+    client: TodoistApi,
+): Promise<{ offsetMinutes: number; weekStartDay: number }> {
     try {
         const user = await executeWithRetry(() => client.getUser())
-        return parseGmtOffsetToMinutes(user.tzInfo?.gmtString || '+00:00')
+        return {
+            offsetMinutes: parseGmtOffsetToMinutes(user.tzInfo?.gmtString || '+00:00'),
+            weekStartDay: user.startDay,
+        }
     } catch (error) {
-        console.error("productivity-analysis: could not load the user's timezone, using UTC", error)
-        return 0
+        console.error(
+            "productivity-analysis: could not load the user's calendar, using UTC and Monday",
+            error,
+        )
+        return { offsetMinutes: 0, weekStartDay: MONDAY }
     }
+}
+
+function isWeekDay(day: number | null | undefined): day is number {
+    return typeof day === 'number' && Number.isInteger(day) && day >= 1 && day <= 7
 }
 
 function buildFocusSections(focus: PromptArgs['focus']): string {
@@ -164,7 +185,8 @@ Present the analysis as a clear, well-structured markdown report with:
 }
 
 async function callback(args: PromptArgs, client: TodoistApi): Promise<GetPromptResult> {
-    const range = computeDateRange(args.period, new Date(), await getUserOffsetMinutes(client))
+    const { offsetMinutes, weekStartDay } = await getUserCalendar(client)
+    const range = computeDateRange(args.period, new Date(), offsetMinutes, weekStartDay)
     return {
         messages: [
             {
