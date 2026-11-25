@@ -1,6 +1,6 @@
 {
     "name": "@todoist/mcp",
-    "version": "17.4.0",
+    "version": "17.4.1",
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",

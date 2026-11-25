@@ -1,3 +1,9 @@
+## [17.4.1](https://github.com/todoist/todoist-mcp/compare/v17.4.0...v17.4.1) (2026-11-25)
+
+### Bug Fixes
+
+* **productivity-analysis:** start this week on the user's week start day ([#770](https://github.com/todoist/todoist-mcp/issues/770)) ([fcc5b52](https://github.com/todoist/todoist-mcp/commit/fcc5b52f0a26fc09d7aef18a2414bbfa7429e821))
+
 ## [17.4.0](https://github.com/todoist/todoist-mcp/compare/v17.3.19...v17.4.0) (2026-11-25)
 
 ### Features
