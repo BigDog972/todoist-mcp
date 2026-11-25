@@ -1,3 +1,9 @@
+## [17.3.18](https://github.com/todoist/todoist-mcp/compare/v17.3.17...v17.3.18) (2026-11-25)
+
+### Bug Fixes
+
+* **deps:** update @todoist/sdk to 24.1.3 ([#769](https://github.com/todoist/todoist-mcp/issues/769)) ([915eb7d](https://github.com/todoist/todoist-mcp/commit/915eb7d17b9b7564bfebd08c0f44a7f887512d9d)), closes [todoist/todoist-sdk-typescript#790](https://github.com/todoist/todoist-sdk-typescript/issues/790) [todoist/todoist-sdk-typescript#786](https://github.com/todoist/todoist-sdk-typescript/issues/786) [todoist/todoist-sdk-typescript#788](https://github.com/todoist/todoist-sdk-typescript/issues/788) [todoist/todoist-sdk-typescript#789](https://github.com/todoist/todoist-sdk-typescript/issues/789)
+
 ## [17.3.17](https://github.com/todoist/todoist-mcp/compare/v17.3.16...v17.3.17) (2026-11-25)
 
 ### Bug Fixes
