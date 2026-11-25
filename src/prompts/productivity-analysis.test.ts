@@ -198,6 +198,45 @@ describe('productivity-analysis prompt', () => {
             expect(text).toContain(`since: "${scenario.since}", until: "${scenario.until}"`)
         })
 
+        it.each([
+            { startDay: 1, dayName: 'Monday', since: '2026-11-23' },
+            { startDay: 7, dayName: 'Sunday', since: '2026-11-22' },
+            { startDay: 6, dayName: 'Saturday', since: '2026-11-21' },
+            { startDay: 3, dayName: 'Wednesday', since: '2026-11-25' },
+        ])(
+            "starts this week on the user's week start day, $dayName",
+            async ({ startDay, dayName, since }) => {
+                vi.setSystemTime(new Date('2026-11-25T12:00:00Z')) // Wednesday
+                mockTodoistApi.getUser.mockResolvedValue(
+                    createMockUser({ ...userWithOffset('+00:00', 'UTC'), startDay }),
+                )
+
+                const text = getPromptText(
+                    await productivityAnalysis.callback(
+                        { period: 'this-week', focus: 'overall' },
+                        mockTodoistApi,
+                    ),
+                )
+
+                expect(text).toContain(`this week (${dayName} to today) (${since} to 2026-11-25)`)
+                expect(text).toContain(`since: "${since}", until: "2026-11-25"`)
+            },
+        )
+
+        it('starts this week on Monday when the user cannot be loaded', async () => {
+            vi.setSystemTime(new Date('2026-11-25T12:00:00Z')) // Wednesday
+            mockTodoistApi.getUser.mockRejectedValue(new Error('network down'))
+
+            const text = getPromptText(
+                await productivityAnalysis.callback(
+                    { period: 'this-week', focus: 'overall' },
+                    mockTodoistApi,
+                ),
+            )
+
+            expect(text).toContain('this week (Monday to today) (2026-11-23 to 2026-11-25)')
+        })
+
         it('falls back to UTC dates when the user cannot be loaded', async () => {
             vi.setSystemTime(new Date('2026-11-25T02:00:00Z'))
             mockTodoistApi.getUser.mockRejectedValue(new Error('network down'))
@@ -297,6 +336,26 @@ describe('productivity-analysis prompt', () => {
 
                 expect(range.since).toBe(since)
                 expect(range.until).toBe(until)
+            },
+        )
+
+        it.each([
+            { startDay: 7, dayName: 'Sunday', date: '2026-03-22', since: '2026-03-22' },
+            { startDay: 7, dayName: 'Sunday', date: '2026-03-21', since: '2026-03-15' },
+            { startDay: 6, dayName: 'Saturday', date: '2026-03-20', since: '2026-03-14' },
+        ])(
+            'should start "this-week" on $dayName for a week starting on day $startDay ($date)',
+            ({ startDay, dayName, date, since }) => {
+                const range = computeDateRange(
+                    'this-week',
+                    new Date(`${date}T12:00:00Z`),
+                    0,
+                    startDay,
+                )
+
+                expect(range.since).toBe(since)
+                expect(range.until).toBe(date)
+                expect(range.periodDescription).toBe(`this week (${dayName} to today)`)
             },
         )
 
