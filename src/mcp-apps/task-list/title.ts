@@ -1,4 +1,4 @@
-import { describeDateRange } from '../../utils/date.js'
+import { describeDateRange, describeDaysFromToday } from '../../utils/date.js'
 import type { FindTasksByDateArgs } from './types'
 
 type TitleArgs = Pick<FindTasksByDateArgs, 'startDate' | 'daysCount' | 'overdueOption'>
@@ -18,12 +18,7 @@ function getTaskListTitle(args: TitleArgs | null): string {
     const daysCount = args?.daysCount ?? 1
 
     if (!args?.startDate || args.startDate === 'today') {
-        if (daysCount === 2) {
-            return 'Tasks for Today and Tomorrow'
-        }
-        return daysCount > 2
-            ? `Tasks for Today and the next ${daysCount - 1} days`
-            : 'Tasks for Today'
+        return `Tasks for ${describeDaysFromToday(daysCount)}`
     }
 
     if (!DATE_PATTERN.test(args.startDate)) {

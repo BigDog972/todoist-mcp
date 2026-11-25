@@ -245,8 +245,7 @@ describe(`${FIND_TASKS_BY_DATE} tool`, () => {
 
                 expect(result.textContent).toContain(heading)
                 expect(result.textContent).not.toContain("Today's tasks")
-                expect(result.textContent).toContain(emptyHint)
-                expect(result.textContent).not.toContain(`${emptyHint} `)
+                expect(result.textContent).toContain(`No results. ${emptyHint}.`)
             },
         )
 

@@ -61,6 +61,16 @@ export function describeDateRange(startDate: string, daysCount: number): string 
 }
 
 /**
+ * The days a search of `daysCount` days from today covers: "Today", "Today and
+ * Tomorrow", or "Today and the next N days".
+ */
+export function describeDaysFromToday(daysCount: number): string {
+    if (daysCount <= 1) return 'Today'
+    if (daysCount === 2) return 'Today and Tomorrow'
+    return `Today and the next ${daysCount - 1} days`
+}
+
+/**
  * Format a number of minutes east of UTC as a GMT offset string (+HH:MM or -HH:MM).
  */
 function formatGmtOffset(offsetMinutes: number): string {

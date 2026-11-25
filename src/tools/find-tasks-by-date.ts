@@ -12,6 +12,7 @@ import { getTasksByFilter, normalizePaginationCursor } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import {
     describeDateRange,
+    describeDaysFromToday,
     getDateInOffset,
     parseGmtOffsetToMinutes,
     shiftDateStringByDays,
@@ -215,16 +216,6 @@ const findTasksByDate = {
     },
 } satisfies TodoistTool<typeof ArgsSchema, typeof OutputSchema>
 
-/**
- * The days a search of `daysCount` days from today covers, worded as the task list
- * app titles it: "Today", "Today and Tomorrow", or "Today and the next N days".
- */
-function describeDaysFromToday(daysCount: number, today: string, tomorrow: string): string {
-    if (daysCount <= 1) return today
-    if (daysCount === 2) return `${today} and ${tomorrow}`
-    return `${today} and the next ${daysCount - 1} days`
-}
-
 function generateTextContent({
     tasks,
     args,
@@ -272,7 +263,7 @@ function generateTextContent({
         const overdueText = args.overdueOption === 'exclude-overdue' ? '' : ' + overdue'
         subject =
             args.daysCount > 1
-                ? `Tasks for ${describeDaysFromToday(args.daysCount, 'Today', 'Tomorrow')}${overdueText}`
+                ? `Tasks for ${describeDaysFromToday(args.daysCount)}${overdueText}`
                 : `Today's tasks${overdueText}`
     } else if (args.startDate) {
         subject = `Tasks for ${describeDateRange(args.startDate, args.daysCount)}`
@@ -294,7 +285,7 @@ function generateTextContent({
         } else if (args.startDate === 'today') {
             const overdueNote = args.overdueOption === 'exclude-overdue' ? '' : ' or overdue'
             zeroReasonHints.push(
-                `Great job! No tasks for ${describeDaysFromToday(args.daysCount, 'today', 'tomorrow')}${overdueNote}`,
+                `Great job! No tasks for ${describeDaysFromToday(args.daysCount).toLowerCase()}${overdueNote}`,
             )
         } else {
             zeroReasonHints.push("Expand date range with larger 'daysCount'")
