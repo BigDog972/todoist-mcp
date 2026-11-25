@@ -1,3 +1,9 @@
+## [17.4.0](https://github.com/todoist/todoist-mcp/compare/v17.3.19...v17.4.0) (2026-11-25)
+
+### Features
+
+* Preserve batch rate-limit metadata ([#771](https://github.com/todoist/todoist-mcp/issues/771)) ([360cb59](https://github.com/todoist/todoist-mcp/commit/360cb5934a2b2f5ba4885fc16abbfbd4a3156537))
+
 ## [17.3.19](https://github.com/todoist/todoist-mcp/compare/v17.3.18...v17.3.19) (2026-11-25)
 
 ### Bug Fixes
