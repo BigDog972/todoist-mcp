@@ -1,3 +1,9 @@
+## [17.3.19](https://github.com/todoist/todoist-mcp/compare/v17.3.18...v17.3.19) (2026-11-25)
+
+### Bug Fixes
+
+* say a create may have been saved when its request fails ([#768](https://github.com/todoist/todoist-mcp/issues/768)) ([ee5a6f2](https://github.com/todoist/todoist-mcp/commit/ee5a6f20b938a624b2276496057334479ffe73ed))
+
 ## [17.3.18](https://github.com/todoist/todoist-mcp/compare/v17.3.17...v17.3.18) (2026-11-25)
 
 ### Bug Fixes
