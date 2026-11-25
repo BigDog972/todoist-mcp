@@ -1,3 +1,9 @@
+## [17.3.16](https://github.com/todoist/todoist-mcp/compare/v17.3.15...v17.3.16) (2026-11-25)
+
+### Bug Fixes
+
+* answer a rate-limited token check with 429 in the HTTP server ([#767](https://github.com/todoist/todoist-mcp/issues/767)) ([f9f676c](https://github.com/todoist/todoist-mcp/commit/f9f676cf962220205bb82ffed26db085a147c4ec)), closes [todoist/mcp-core#19](https://github.com/todoist/mcp-core/issues/19)
+
 ## [17.3.15](https://github.com/todoist/todoist-mcp/compare/v17.3.14...v17.3.15) (2026-11-24)
 
 ### Bug Fixes
