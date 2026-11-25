@@ -237,6 +237,22 @@ describe('productivity-analysis prompt', () => {
             expect(text).toContain('this week (Monday to today) (2026-11-23 to 2026-11-25)')
         })
 
+        it("starts this week on Monday when the user's week start day is outside 1 to 7", async () => {
+            vi.setSystemTime(new Date('2026-11-25T12:00:00Z')) // Wednesday
+            mockTodoistApi.getUser.mockResolvedValue(
+                createMockUser({ ...userWithOffset('+00:00', 'UTC'), startDay: 0 }),
+            )
+
+            const text = getPromptText(
+                await productivityAnalysis.callback(
+                    { period: 'this-week', focus: 'overall' },
+                    mockTodoistApi,
+                ),
+            )
+
+            expect(text).toContain('this week (Monday to today) (2026-11-23 to 2026-11-25)')
+        })
+
         it('falls back to UTC dates when the user cannot be loaded', async () => {
             vi.setSystemTime(new Date('2026-11-25T02:00:00Z'))
             mockTodoistApi.getUser.mockRejectedValue(new Error('network down'))
@@ -356,6 +372,21 @@ describe('productivity-analysis prompt', () => {
                 expect(range.since).toBe(since)
                 expect(range.until).toBe(date)
                 expect(range.periodDescription).toBe(`this week (${dayName} to today)`)
+            },
+        )
+
+        it.each([0, 8, 1.5])(
+            'should start "this-week" on Monday for a week start day outside 1 to 7 (%s)',
+            (startDay) => {
+                const range = computeDateRange(
+                    'this-week',
+                    new Date('2026-11-25T12:00:00Z'), // Wednesday
+                    0,
+                    startDay,
+                )
+
+                expect(range.since).toBe('2026-11-23')
+                expect(range.periodDescription).toBe('this week (Monday to today)')
             },
         )
 

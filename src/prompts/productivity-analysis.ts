@@ -34,7 +34,8 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
  * the user's Todoist timezone, so the range follows the user's calendar rather than
  * the server's. The arithmetic runs on UTC calendar dates, so the server's own
  * timezone and daylight-saving changes cannot move a day. "This week" starts on
- * `weekStartDay` (1 = Monday, 7 = Sunday), the user's own setting.
+ * `weekStartDay` (1 = Monday, 7 = Sunday), the user's own setting; any other value
+ * starts it on Monday.
  */
 function computeDateRange(
     period: PromptArgs['period'],
@@ -60,11 +61,12 @@ function computeDateRange(
 
         case 'this-week': {
             // Both days counted 1 (Monday) to 7 (Sunday), as Todoist numbers its start day.
+            const startDay = isWeekDay(weekStartDay) ? weekStartDay : MONDAY
             const dayOfWeek = new Date(`${until}T00:00:00Z`).getUTCDay() || 7
             return {
-                since: daysBefore((dayOfWeek - weekStartDay + 7) % 7),
+                since: daysBefore((dayOfWeek - startDay + 7) % 7),
                 until,
-                periodDescription: `this week (${DAY_NAMES[weekStartDay - 1] ?? 'Monday'} to today)`,
+                periodDescription: `this week (${DAY_NAMES[startDay - 1]} to today)`,
             }
         }
 
@@ -90,7 +92,7 @@ async function getUserCalendar(
         const user = await executeWithRetry(() => client.getUser())
         return {
             offsetMinutes: parseGmtOffsetToMinutes(user.tzInfo?.gmtString || '+00:00'),
-            weekStartDay: isWeekDay(user.startDay) ? user.startDay : MONDAY,
+            weekStartDay: user.startDay,
         }
     } catch (error) {
         console.error(
