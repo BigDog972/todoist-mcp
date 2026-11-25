@@ -1,3 +1,10 @@
+## [17.3.17](https://github.com/todoist/todoist-mcp/compare/v17.3.16...v17.3.17) (2026-11-25)
+
+### Bug Fixes
+
+* **find-tasks-by-date:** name the days a multi-day search from today covers ([#765](https://github.com/todoist/todoist-mcp/issues/765)) ([6e66265](https://github.com/todoist/todoist-mcp/commit/6e66265008f1d8d3546e7c409021b3a0cdba09cb)), closes [#763](https://github.com/todoist/todoist-mcp/issues/763)
+* **productivity-analysis:** date the analysis on the user's calendar ([#766](https://github.com/todoist/todoist-mcp/issues/766)) ([943a36e](https://github.com/todoist/todoist-mcp/commit/943a36ef2fed60f8fcf0a922f08289425d5375ba))
+
 ## [17.3.16](https://github.com/todoist/todoist-mcp/compare/v17.3.15...v17.3.16) (2026-11-25)
 
 ### Bug Fixes
