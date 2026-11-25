@@ -213,6 +213,44 @@ describe(`${FIND_TASKS_BY_DATE} tool`, () => {
     describe('summary of a date range', () => {
         it.each([
             {
+                name: 'two days with overdue',
+                daysCount: 2,
+                overdueOption: undefined,
+                heading: 'Tasks for Today and Tomorrow + overdue:',
+                emptyHint: 'Great job! No tasks for today and tomorrow or overdue',
+            },
+            {
+                name: 'a week with overdue',
+                daysCount: 7,
+                overdueOption: undefined,
+                heading: 'Tasks for Today and the next 6 days + overdue:',
+                emptyHint: 'Great job! No tasks for today and the next 6 days or overdue',
+            },
+            {
+                name: 'a week without overdue',
+                daysCount: 7,
+                overdueOption: 'exclude-overdue' as const,
+                heading: 'Tasks for Today and the next 6 days:',
+                emptyHint: 'Great job! No tasks for today and the next 6 days',
+            },
+        ])(
+            'names the days searched from today for $name',
+            async ({ daysCount, overdueOption, heading, emptyHint }) => {
+                mockGetTasksByFilter.mockResolvedValue({ tasks: [], nextCursor: null })
+
+                const result = await findTasksByDate.execute(
+                    { startDate: 'today', daysCount, limit: 50, overdueOption },
+                    mockTodoistApi,
+                )
+
+                expect(result.textContent).toContain(heading)
+                expect(result.textContent).not.toContain("Today's tasks")
+                expect(result.textContent).toContain(`No results. ${emptyHint}.`)
+            },
+        )
+
+        it.each([
+            {
                 name: 'a three-day range',
                 startDate: '2025-08-20',
                 daysCount: 3,

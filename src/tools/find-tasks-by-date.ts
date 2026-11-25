@@ -12,6 +12,7 @@ import { getTasksByFilter, normalizePaginationCursor } from '../tool-helpers.js'
 import { ApiLimits } from '../utils/constants.js'
 import {
     describeDateRange,
+    describeDaysFromToday,
     getDateInOffset,
     parseGmtOffsetToMinutes,
     shiftDateStringByDays,
@@ -259,8 +260,11 @@ function generateTextContent({
     if (args.overdueOption === 'overdue-only') {
         subject = 'Overdue tasks'
     } else if (args.startDate === 'today') {
+        const overdueText = args.overdueOption === 'exclude-overdue' ? '' : ' + overdue'
         subject =
-            args.overdueOption === 'exclude-overdue' ? `Today's tasks` : `Today's tasks + overdue`
+            args.daysCount > 1
+                ? `Tasks for ${describeDaysFromToday(args.daysCount)}${overdueText}`
+                : `Today's tasks${overdueText}`
     } else if (args.startDate) {
         subject = `Tasks for ${describeDateRange(args.startDate, args.daysCount)}`
     } else {
@@ -280,7 +284,9 @@ function generateTextContent({
             zeroReasonHints.push('Great job! No overdue tasks')
         } else if (args.startDate === 'today') {
             const overdueNote = args.overdueOption === 'exclude-overdue' ? '' : ' or overdue'
-            zeroReasonHints.push(`Great job! No tasks for today${overdueNote}`)
+            zeroReasonHints.push(
+                `Great job! No tasks for ${describeDaysFromToday(args.daysCount).toLowerCase()}${overdueNote}`,
+            )
         } else {
             zeroReasonHints.push("Expand date range with larger 'daysCount'")
             zeroReasonHints.push("Check today's tasks with startDate='today'")
