@@ -145,6 +145,7 @@ New tool? Full checklist in `AGENTS.md`. Short version: copy `add-tasks.ts`; add
 - `labels.ts` — label name normalization, and `matchesLabels`/`findLabelName`, which compare names the way the filter query does (ignoring case and accents)
 - `filtered-pages.ts` — `collectFilteredPage`: one page of `limit` matches for a short list the API cannot filter (a project's tasks), read from the start on every call, with a cursor naming the next match so that completing returned items between calls neither skips matches nor ends the list
 - `colors.ts` — Todoist color name ↔ key
+- `template-content.ts` — `TemplateContentSchema`, the template content tools take and return (`p1`–`p4` priorities, complete dates), with `toSdkTemplateContent`/`toToolTemplateContent` to convert it and `outlineTemplateContent` for a short text outline
 - `reminder-schemas.ts` — reminder-specific shapes
 - `assignment-validator.ts` — validate collaborator assignments
 - `user-resolver.ts` / `workspace-resolver.ts` — resolve user/workspace refs. `userResolver.getUserShortNames` and `getAssigneeShortNames` name people by short name (`Ada L.`), as the Todoist CLI does, for tool text output
@@ -153,13 +154,14 @@ New tool? Full checklist in `AGENTS.md`. Short version: copy `add-tasks.ts`; add
 - Batch failures may carry `code: 'RATE_LIMITED'` and `retryAfterSeconds` from a confirmed HTTP 429's body. Partial task moves keep `PARTIAL_MOVE_APPLIED` instead. These fields do not mean the whole operation is safe to replay. The SDK currently discards response headers, so header-only retry instructions are not exposed here.
 - `response-builders.ts` — `summarizeTaskOperation`, `summarizeBatch`, `appendFailureSummary`, `previewTasks` (keep output messages consistent)
 - `retry.ts` — `executeWithRetry()` used inside `registerTool`; exponential backoff with full jitter. `executeCreateWithRetry()` for creates: retries only a 503, and reports a failure that may have saved the item anyway as an `UnconfirmedCreateError`, which tells the model to check before adding it again
+- `template-ids.ts` — `extractTemplateId`: a template ID from a bare ID, a gallery slug or a Todoist template URL; rejects non-Todoist hosts
 - `user-status.ts` — `UserStatusOutputSchema`, `fetchUserStatus` and `buildUserStatusResult`, shared by `get-user-status` and `set-user-status`
 - `sync-commands.ts` — `settleSyncCommands`: sends Sync commands in one request and reports whether each was applied, for batch tools backed by the Sync API
 - `order-keys.ts` — `computeOrderKeys`: the fractional-indexing order keys that place entities at given positions among their siblings, re-keying only what moved. Todoist orders projects, sections and folders by these keys; the integer `*_reorder` Sync commands are deprecated
 - `concurrency.ts` — `getMoveLimiter`/`getWriteLimiter` bound how many write requests a batch tool has in flight. Limiters are per account (registered by `createTodoistClient`), because the HTTP transport builds a client per request. Task moves get their own single-slot lane: the API locks a task's whole tree for a move, so overlapping moves contend
 - `move-planner.ts` — `planMove`/`isMoveRedundant`/`destinationKey`: decides whether a requested container change is a real move, and groups tasks bound for the same destination so they can share one request
 - `validate-todoist-token.ts` — token validation (`'valid' | 'invalid' | 'forbidden'`) for the HTTP middleware and for hosts: `@todoist/mcp-core/host`'s `validateBearerToken` against `/api/v1/user`, sent through the SDK's proxy-aware transport
-- `test-helpers.ts` — `createMockTask`, `createMockProject`, `createMockSection`, `TEST_IDS`, `TODAY`
+- `test-helpers.ts` — `createMockTask`, `createMockProject`, `createMockSection`, `createMockTemplate`, `TEST_IDS`, `TODAY`
 
 ## Todoist SDK + auth
 

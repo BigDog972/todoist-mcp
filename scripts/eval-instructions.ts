@@ -218,6 +218,33 @@ const SCENARIOS: Scenario[] = [
         guards: 'instructions: workspace projects archive before delete',
     },
     {
+        id: 'project-from-template',
+        prompt: 'Start a new project from the "product-launch" template.',
+        expect: [ToolNames.ADD_PROJECTS],
+        check: (input) => {
+            const projects = Array.isArray(input.projects) ? input.projects : []
+            return projects.some(
+                (project) =>
+                    typeof project === 'object' &&
+                    project !== null &&
+                    'templateId' in project &&
+                    project.templateId === 'product-launch',
+            )
+                ? null
+                : `no project with templateId "product-launch": ${JSON.stringify(input)}`
+        },
+        guards: 'add-projects input: templateId creates a project from a template',
+    },
+    {
+        id: 'edit-template-reads-first',
+        prompt: 'In my saved template UT_28ExampleTemplateId000001, rename the "Kickoff" task to "Kickoff meeting".',
+        // update-template replaces the whole content, so the content has to be read first.
+        expect: [ToolNames.FETCH_OBJECT],
+        check: (input) =>
+            input.type === 'template' ? null : `not a template fetch: ${JSON.stringify(input)}`,
+        guards: 'fetch-object and update-template descriptions: read the content before editing it',
+    },
+    {
         id: 'priority-string',
         prompt: 'Set task 6XG4Vw2c9J to high priority.',
         expect: [ToolNames.UPDATE_TASKS],
@@ -445,6 +472,65 @@ const SCENARIOS: Scenario[] = [
         guards: 'delete-object folder: deleting a folder',
     },
     {
+        // A saved template can't be deleted through the API, so a template the
+        // user didn't want stays until they remove it in the app. The ID is in
+        // the prompt so the first call is the save, not a lookup.
+        id: 'save-template-shows-draft',
+        prompt: 'Save my project 6XG4Pr0j3c ("Client onboarding") as a template.',
+        expect: [ToolNames.ADD_TEMPLATE],
+        check: (input) =>
+            input.preview === false
+                ? 'saved straight away, without showing the user the draft first'
+                : input.projectId === '6XG4Pr0j3c'
+                  ? null
+                  : `projectId is ${JSON.stringify(input.projectId)}, so this doesn't start from the user's project`,
+        guards: 'add-template from a project: the draft comes first unless the user asked to save as is',
+    },
+    {
+        id: 'save-template-as-is',
+        prompt: 'Save my project 6XG4Pr0j3c ("Client onboarding") as a template called "Onboarding", as it is. No changes needed.',
+        expect: [ToolNames.ADD_TEMPLATE],
+        check: (input) =>
+            input.preview !== false
+                ? `preview is ${JSON.stringify(input.preview)}, so the user who asked to save as is gets a draft`
+                : input.projectId !== '6XG4Pr0j3c'
+                  ? `projectId is ${JSON.stringify(input.projectId)}, so this doesn't save the user's project`
+                  : input.name !== 'Onboarding'
+                    ? `name is ${JSON.stringify(input.name)}, not the "Onboarding" the user asked for`
+                    : typeof input.description !== 'string' || input.description.trim() === ''
+                      ? 'no description, which a save needs, so the call would fail'
+                      : null,
+        guards: 'add-template from a project: saving in one call when the user asked for no changes',
+    },
+    {
+        id: 'csv-template-shows-draft',
+        prompt: 'Make a template out of this CSV:\n\nTYPE,CONTENT,PRIORITY\nsection,Week 1,\ntask,Plan the launch,1\ntask,Write the announcement,2',
+        expect: [ToolNames.ADD_TEMPLATE],
+        check: (input) =>
+            input.preview === false
+                ? 'created straight away, without showing the user the draft first'
+                : typeof input.csvFileContent === 'string'
+                  ? null
+                  : 'the CSV was not passed as csvFileContent',
+        guards: 'add-template from CSV: the draft comes first unless the user asked to save as is',
+    },
+    {
+        // Before add-template, a template from scratch had to borrow an
+        // unrelated project's ID, inheriting its color and workspace.
+        id: 'template-from-scratch',
+        prompt: 'Create a template called "Weekly review" with three tasks: clear the inbox, review the calendar, and plan next week.',
+        expect: [ToolNames.ADD_TEMPLATE],
+        check: (input) => {
+            if (input.projectId !== undefined) {
+                return `projectId is ${JSON.stringify(input.projectId)}, so the template borrows a project`
+            }
+            return input.preview === false
+                ? 'saved straight away, without showing the user the draft first'
+                : null
+        },
+        guards: 'add-template from scratch: no project, and the draft comes first',
+    },
+    {
         // A migration hands over long lists. add-tasks takes up to 100 tasks in one
         // call, so a list of 40 should go in whole rather than in several calls.
         id: 'bulk-add-one-call',
@@ -457,6 +543,17 @@ const SCENARIOS: Scenario[] = [
                 : `sent ${tasks.length} of ${BULK_TASK_NAMES.length} tasks in the first call`
         },
         guards: 'add-tasks input schema: up to 100 tasks per call',
+    },
+    {
+        // Without find-templates the model had to ask for an ID or guess a slug.
+        id: 'find-template-by-name',
+        prompt: 'Start a new project from my "Team onboarding" template.',
+        expect: [ToolNames.FIND_TEMPLATES],
+        check: (input) =>
+            typeof input.query === 'string' && /onboarding/i.test(input.query)
+                ? null
+                : `query is ${JSON.stringify(input.query)}, not a search for the template's name`,
+        guards: 'find-templates: looking up a template the user named without an ID',
     },
 ]
 

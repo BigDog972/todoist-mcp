@@ -80,8 +80,11 @@ export const ToolNames = {
     UPDATE_FILTERS: 'update-filters',
 
     // Template tools
-    EXPORT_PROJECT_TEMPLATE: 'export-project-template',
-    IMPORT_PROJECT_TEMPLATE: 'import-project-template',
+    EXPORT_PROJECT: 'export-project',
+    IMPORT_INTO_PROJECT: 'import-into-project',
+    ADD_TEMPLATE: 'add-template',
+    FIND_TEMPLATES: 'find-templates',
+    UPDATE_TEMPLATE: 'update-template',
 
     // Workspace tools
     LIST_WORKSPACES: 'list-workspaces',

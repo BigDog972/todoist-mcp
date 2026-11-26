@@ -307,18 +307,38 @@ describeToolAnnotations({
             destructiveHint: false,
             idempotentHint: true,
         },
-        [ToolNames.EXPORT_PROJECT_TEMPLATE]: {
-            title: 'Todoist: Export Project Template',
+        [ToolNames.EXPORT_PROJECT]: {
+            title: 'Todoist: Export Project',
             readOnlyHint: false,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-        [ToolNames.IMPORT_PROJECT_TEMPLATE]: {
-            title: 'Todoist: Import Project Template',
+        [ToolNames.IMPORT_INTO_PROJECT]: {
+            title: 'Todoist: Import Into Project',
             readOnlyHint: false,
             destructiveHint: false,
             idempotentHint: false,
+        },
+        [ToolNames.ADD_TEMPLATE]: {
+            title: 'Todoist: Add Template',
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true,
+        },
+        [ToolNames.FIND_TEMPLATES]: {
+            title: 'Todoist: Find Templates',
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+        },
+        [ToolNames.UPDATE_TEMPLATE]: {
+            title: 'Todoist: Update Template',
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: true,
+            openWorldHint: true,
         },
         [ToolNames.SEARCH]: {
             title: 'Todoist: Search',

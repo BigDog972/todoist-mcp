@@ -20,11 +20,12 @@ import { addReminders } from './tools/add-reminders.js'
 import { addSections } from './tools/add-sections.js'
 // Task management tools
 import { addTasks } from './tools/add-tasks.js'
+import { addTemplate } from './tools/add-template.js'
 import { analyzeProjectHealth } from './tools/analyze-project-health.js'
 import { completeTasks } from './tools/complete-tasks.js'
 // General tools
 import { deleteObject } from './tools/delete-object.js'
-import { exportProjectTemplate } from './tools/export-project-template.js'
+import { exportProject } from './tools/export-project.js'
 import { fetchObject } from './tools/fetch-object.js'
 import { fetch } from './tools/fetch.js'
 // Activity and audit tools
@@ -41,13 +42,14 @@ import { findReminders } from './tools/find-reminders.js'
 import { findSections } from './tools/find-sections.js'
 import { findTasksByDate } from './tools/find-tasks-by-date.js'
 import { findTasks } from './tools/find-tasks.js'
+import { findTemplates } from './tools/find-templates.js'
 import { getOverview } from './tools/get-overview.js'
 import { getProductivityStats } from './tools/get-productivity-stats.js'
 import { getProjectActivityStats } from './tools/get-project-activity-stats.js'
 import { getProjectHealth } from './tools/get-project-health.js'
 import { getUserStatus } from './tools/get-user-status.js'
 import { getWorkspaceInsights } from './tools/get-workspace-insights.js'
-import { importProjectTemplate } from './tools/import-project-template.js'
+import { importIntoProject } from './tools/import-into-project.js'
 import { listWorkspaces } from './tools/list-workspaces.js'
 import { manageAssignments } from './tools/manage-assignments.js'
 import { projectManagement } from './tools/project-management.js'
@@ -65,6 +67,7 @@ import { updateProjects } from './tools/update-projects.js'
 import { updateReminders } from './tools/update-reminders.js'
 import { updateSections } from './tools/update-sections.js'
 import { updateTasks } from './tools/update-tasks.js'
+import { updateTemplate } from './tools/update-template.js'
 import { userInfo } from './tools/user-info.js'
 import { viewAttachment } from './tools/view-attachment.js'
 import { validateTodoistToken } from './utils/validate-todoist-token.js'
@@ -122,8 +125,11 @@ export {
     findProjectCollaborators,
     manageAssignments,
     // Template tools
-    exportProjectTemplate,
-    importProjectTemplate,
+    exportProject,
+    importIntoProject,
+    addTemplate,
+    findTemplates,
+    updateTemplate,
     // Workspace tools
     listWorkspaces,
     // Attachment tools

@@ -27,6 +27,10 @@ export const ApiLimits = {
     PROJECTS_DEFAULT: 50,
     /** Maximum limit for project listings */
     PROJECTS_MAX: 200,
+    /** Default limit for template listings */
+    TEMPLATES_DEFAULT: 20,
+    /** Maximum limit for template listings */
+    TEMPLATES_MAX: 50,
     /** Maximum limit for section listings */
     SECTIONS_MAX: 200,
     /** Page size for reading a workspace's folders */
@@ -92,6 +96,20 @@ export const BatchLimits = {
     BULK_ACTIONS_PER_OPERATION: 50,
     /** Maximum labels set on one task by one call */
     LABELS_PER_TASK: 50,
+} as const
+
+// Template Content Limits
+export const TemplateContentLimits = {
+    /** A template creates one project; the backend rejects more. */
+    PROJECTS: 1,
+    /** The API takes at most one set of calendar settings. */
+    PROJECT_VIEW_OPTIONS: 1,
+    /**
+     * Maximum sections, tasks or comments in one template's content. The API sets no
+     * limit; this one is far above real templates (the gallery's Weekly Review has 26
+     * tasks) and still bounds what one call can write.
+     */
+    ITEMS: 500,
 } as const
 
 // Concurrency Limits
