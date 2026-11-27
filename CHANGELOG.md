@@ -1,3 +1,13 @@
+## [18.1.0](https://github.com/todoist/todoist-mcp/compare/v18.0.1...v18.1.0) (2026-11-27)
+
+### Features
+
+* describe the server in serverInfo ([#781](https://github.com/todoist/todoist-mcp/issues/781)) ([ca052d4](https://github.com/todoist/todoist-mcp/commit/ca052d407af774bf897c70dd505dce4ba08bb206))
+
+### Bug Fixes
+
+* keep server instructions within Claude Code's 4,096-character limit ([#774](https://github.com/todoist/todoist-mcp/issues/774)) ([e32e2db](https://github.com/todoist/todoist-mcp/commit/e32e2db030ea318797d0ebd729c46ab8c0fb2ffc))
+
 ## [18.0.1](https://github.com/todoist/todoist-mcp/compare/v18.0.0...v18.0.1) (2026-11-27)
 
 ### Bug Fixes
