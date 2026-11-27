@@ -1,3 +1,13 @@
+## [19.0.0](https://github.com/todoist/todoist-mcp/compare/v18.1.0...v19.0.0) (2026-11-27)
+
+### ⚠ BREAKING CHANGES
+
+* serve skills over MCP (#775)
+
+### Features
+
+* serve skills over MCP ([#775](https://github.com/todoist/todoist-mcp/issues/775)) ([eac80ac](https://github.com/todoist/todoist-mcp/commit/eac80ac5fcd343637db02c9ac2eac0b381f79a6a))
+
 ## [18.1.0](https://github.com/todoist/todoist-mcp/compare/v18.0.1...v18.1.0) (2026-11-27)
 
 ### Features
