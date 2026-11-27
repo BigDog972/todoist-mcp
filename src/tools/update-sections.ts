@@ -1,4 +1,4 @@
-import type { Section } from '@todoist/sdk'
+import type { Section, TodoistApi } from '@todoist/sdk'
 import { z } from 'zod'
 import type { TodoistTool } from '../todoist-tool.js'
 import { logBatchFailures, partitionSettled } from '../utils/batch-failures.js'
@@ -30,10 +30,20 @@ const SectionUpdateSchema = z
                     ),
             )
             .optional(),
+        isArchived: z
+            .boolean()
+            .optional()
+            .describe(
+                `true archives (keeping its tasks, unlike ${ToolNames.DELETE_OBJECT}), false unarchives.`,
+            ),
     })
-    .refine((data) => data.name !== undefined || data.description !== undefined, {
-        message: 'Provide at least one of "name" or "description" to update.',
-    })
+    .refine(
+        (data) =>
+            data.name !== undefined ||
+            data.description !== undefined ||
+            data.isArchived !== undefined,
+        { message: 'Provide at least one of "name", "description" or "isArchived" to update.' },
+    )
 
 const ArgsSchema = {
     sections: z
@@ -58,7 +68,7 @@ const OutputSchema = {
 
 const updateSections = {
     name: ToolNames.UPDATE_SECTIONS,
-    description: 'Update multiple existing sections with new values.',
+    description: 'Update, archive or unarchive multiple existing sections.',
     parameters: ArgsSchema,
     outputSchema: OutputSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
@@ -66,20 +76,7 @@ const updateSections = {
         // Each section is updated independently, so one rejection neither discards the
         // sections that were updated nor hides them behind one error.
         const settled = await Promise.allSettled(
-            sections.map(({ id, name, description }) => {
-                // The SDK's UpdateSectionArgs is RequireAtLeastOne, which a
-                // dynamically-built partial can't satisfy statically; the schema
-                // refine guarantees at least one field. An empty `description`
-                // clears it, which the section wire represents as `null`
-                // (backend NULL_CLEARS).
-                const updateArgs = {
-                    ...(name !== undefined ? { name } : {}),
-                    ...(description !== undefined
-                        ? { description: description === '' ? null : description }
-                        : {}),
-                } as Parameters<typeof client.updateSection>[1]
-                return executeWithRetry(() => client.updateSection(id, updateArgs))
-            }),
+            sections.map((section) => updateSection(section, client)),
         )
 
         const { succeeded, failures } = partitionSettled(sections, settled, (section) => section.id)
@@ -88,7 +85,10 @@ const updateSections = {
         logBatchFailures(ToolNames.UPDATE_SECTIONS, sections.length, failures)
 
         const textContent = generateTextContent({
-            sections: updatedSections,
+            updated: succeeded.map(({ item, value }) => ({
+                section: value,
+                isArchived: item.isArchived,
+            })),
             failures,
         })
 
@@ -108,16 +108,58 @@ const updateSections = {
     },
 } satisfies TodoistTool<typeof ArgsSchema, typeof OutputSchema>
 
+/**
+ * Apply one section's changes. A section is unarchived before it is renamed and
+ * archived after, so the field update never lands on an archived section, and the
+ * section returned is the one from the last call.
+ */
+async function updateSection(
+    { id, name, description, isArchived }: z.infer<typeof SectionUpdateSchema>,
+    client: TodoistApi,
+): Promise<Section> {
+    let section: Section | undefined
+
+    if (isArchived === false) {
+        section = await executeWithRetry(() => client.unarchiveSection(id))
+    }
+
+    if (name !== undefined || description !== undefined) {
+        // The SDK's UpdateSectionArgs is RequireAtLeastOne, which a
+        // dynamically-built partial can't satisfy statically; the check above
+        // guarantees at least one field. An empty `description` clears it, which
+        // the section wire represents as `null` (backend NULL_CLEARS).
+        const updateArgs = {
+            ...(name !== undefined ? { name } : {}),
+            ...(description !== undefined
+                ? { description: description === '' ? null : description }
+                : {}),
+        } as Parameters<typeof client.updateSection>[1]
+        section = await executeWithRetry(() => client.updateSection(id, updateArgs))
+    }
+
+    if (isArchived === true) {
+        section = await executeWithRetry(() => client.archiveSection(id))
+    }
+
+    // The schema refine guarantees at least one of the calls above ran.
+    return section as Section
+}
+
+const ARCHIVE_NOTE = { true: ' - archived', false: ' - unarchived' } as const
+
 function generateTextContent({
-    sections,
+    updated,
     failures,
 }: {
-    sections: Section[]
+    updated: Array<{ section: Section; isArchived: boolean | undefined }>
     failures: Array<{ item: string; error: string }>
 }) {
-    const count = sections.length
-    const sectionList = sections
-        .map((section) => `• ${section.name} (id=${section.id}, projectId=${section.projectId})`)
+    const count = updated.length
+    const sectionList = updated
+        .map(({ section, isArchived }) => {
+            const note = isArchived === undefined ? '' : ARCHIVE_NOTE[`${isArchived}`]
+            return `• ${section.name} (id=${section.id}, projectId=${section.projectId})${note}`
+        })
         .join('\n')
 
     const summary =
