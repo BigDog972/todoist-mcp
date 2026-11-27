@@ -6,6 +6,7 @@ import { formatBatchItemError } from '../tool-execution-error.js'
 import { mapTask } from '../tool-helpers.js'
 import { logBatchFailures, partitionSettled } from '../utils/batch-failures.js'
 import { BatchLimits } from '../utils/constants.js'
+import { getZoneOffsetMinutes, parseGmtOffsetToMinutes } from '../utils/date.js'
 import { parseItemDuration } from '../utils/duration-parser.js'
 import { FailureSchema, TaskSchema as TaskOutputSchema } from '../utils/output-schemas.js'
 import { appendFailureSummary, summarizeTaskOperation } from '../utils/response-builders.js'
@@ -179,10 +180,55 @@ function buildRescheduleDate(inputDate: string, existingDue: NonNullable<Task['d
     const timePart = existingDue.date.substring(10)
 
     if (isInputDateOnly && timePart) {
+        if (timePart.endsWith('Z') && existingDue.timezone) {
+            const moved = moveFixedDateTime(inputDate, existingDue.date, existingDue.timezone)
+            if (moved) return moved
+        }
         return inputDate + timePart
     }
 
     return inputDate
+}
+
+/**
+ * Moves a fixed-timezone due to `inputDate` at the same local time.
+ * Example: `2026-12-11T02:00:00Z` in America/New_York (9pm Dec 10) moved to `2026-12-12` is `2026-12-13T02:00:00Z`.
+ */
+function moveFixedDateTime(
+    inputDate: string,
+    utcDate: string,
+    timezone: string,
+): string | undefined {
+    const existing = Date.parse(utcDate)
+    const existingOffset = getUtcOffsetMinutes(timezone, existing)
+    if (existingOffset === undefined) return undefined
+
+    const localTime = new Date(existing + existingOffset * 60_000).toISOString().slice(11, 19)
+    const targetAsUtc = Date.parse(`${inputDate}T${localTime}Z`)
+    if (
+        Number.isNaN(targetAsUtc) ||
+        new Date(targetAsUtc).toISOString().slice(0, 10) !== inputDate
+    ) {
+        return undefined
+    }
+    const targetOffset =
+        getUtcOffsetMinutes(timezone, targetAsUtc - existingOffset * 60_000) ?? existingOffset
+    return `${new Date(targetAsUtc - targetOffset * 60_000).toISOString().slice(0, 19)}Z`
+}
+
+const FIXED_OFFSET_TIMEZONE = /^GMT ([+-])(\d{1,2}):(\d{2})$/
+
+/**
+ * Returns the UTC offset of `timezone` at `instant`, in minutes.
+ * Accepts IANA names (`America/New_York`) and fixed offsets (`GMT +5:00`), and returns `undefined` for anything else.
+ */
+function getUtcOffsetMinutes(timezone: string, instant: number): number | undefined {
+    const fixedOffset = FIXED_OFFSET_TIMEZONE.exec(timezone)
+    if (fixedOffset) {
+        const [, sign, hours, minutes] = fixedOffset
+        return parseGmtOffsetToMinutes(`${sign}${hours?.padStart(2, '0')}:${minutes}`)
+    }
+    return getZoneOffsetMinutes(instant, timezone)
 }
 
 export { buildRescheduleDate, rescheduleTasks }
