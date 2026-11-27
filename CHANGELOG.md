@@ -1,3 +1,9 @@
+## [19.1.0](https://github.com/todoist/todoist-mcp/compare/v19.0.0...v19.1.0) (2026-11-27)
+
+### Features
+
+* ask the user to confirm deletes and imports into a project ([#782](https://github.com/todoist/todoist-mcp/issues/782)) ([0bdb70d](https://github.com/todoist/todoist-mcp/commit/0bdb70d27a059b68fcb712179e31e11f5ff320e9))
+
 ## [19.0.0](https://github.com/todoist/todoist-mcp/compare/v18.1.0...v19.0.0) (2026-11-27)
 
 ### ⚠ BREAKING CHANGES
