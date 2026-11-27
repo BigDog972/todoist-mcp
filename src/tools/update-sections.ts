@@ -1,6 +1,7 @@
 import type { Section, TodoistApi } from '@todoist/sdk'
 import { z } from 'zod'
 import type { TodoistTool } from '../todoist-tool.js'
+import { formatBatchItemError, getRateLimitDetails } from '../tool-execution-error.js'
 import { logBatchFailures, partitionSettled } from '../utils/batch-failures.js'
 import { BatchLimits } from '../utils/constants.js'
 import {
@@ -79,15 +80,28 @@ const updateSections = {
             sections.map((section) => updateSection(section, client)),
         )
 
-        const { succeeded, failures } = partitionSettled(sections, settled, (section) => section.id)
-        const updatedSections = succeeded.map(({ value }) => value)
+        const partitioned = partitionSettled(sections, settled, (section) => section.id)
+        const succeeded = partitioned.succeeded.map(({ item, value }) => ({
+            id: item.id,
+            ...value,
+        }))
+        // A section whose first call worked but a later one failed is reported in both
+        // lists: as updated, since what was applied stays applied, and as a failure
+        // naming the step that did not happen.
+        const failures = [
+            ...partitioned.failures,
+            ...succeeded.flatMap(({ id, partial }) =>
+                partial ? [{ item: id, ...partial, code: PARTIAL_UPDATE_APPLIED }] : [],
+            ),
+        ]
+        const updatedSections = succeeded.map(({ section }) => section)
 
         logBatchFailures(ToolNames.UPDATE_SECTIONS, sections.length, failures)
 
         const textContent = generateTextContent({
-            updated: succeeded.map(({ item, value }) => ({
-                section: value,
-                isArchived: item.isArchived,
+            updated: succeeded.map(({ section, archiveChange }) => ({
+                section,
+                isArchived: archiveChange,
             })),
             failures,
         })
@@ -108,19 +122,41 @@ const updateSections = {
     },
 } satisfies TodoistTool<typeof ArgsSchema, typeof OutputSchema>
 
+const PARTIAL_UPDATE_APPLIED = 'PARTIAL_UPDATE_APPLIED'
+
+type SectionOutcome = {
+    section: Section
+    /** The archive state this item changed, when that call was applied. */
+    archiveChange?: boolean
+    /** Set when an earlier call was applied and a later one failed. */
+    partial?: { error: string; retryAfterSeconds?: number }
+}
+
 /**
  * Apply one section's changes. A section is unarchived before it is renamed and
  * archived after, so the field update never lands on an archived section, and the
- * section returned is the one from the last call.
+ * section returned is the one from the last call that worked.
+ *
+ * A failure on the first call rejects, so nothing was applied. A failure on a later
+ * call resolves with what was applied and the step that failed, so the caller does
+ * not retry a change that already happened.
  */
 async function updateSection(
     { id, name, description, isArchived }: z.infer<typeof SectionUpdateSchema>,
     client: TodoistApi,
-): Promise<Section> {
-    let section: Section | undefined
+): Promise<SectionOutcome> {
+    const steps: Array<{
+        label: string
+        archiveChange?: boolean
+        run: () => Promise<Section>
+    }> = []
 
     if (isArchived === false) {
-        section = await executeWithRetry(() => client.unarchiveSection(id))
+        steps.push({
+            label: 'unarchive',
+            archiveChange: false,
+            run: () => client.unarchiveSection(id),
+        })
     }
 
     if (name !== undefined || description !== undefined) {
@@ -134,15 +170,45 @@ async function updateSection(
                 ? { description: description === '' ? null : description }
                 : {}),
         } as Parameters<typeof client.updateSection>[1]
-        section = await executeWithRetry(() => client.updateSection(id, updateArgs))
+        steps.push({ label: 'update', run: () => client.updateSection(id, updateArgs) })
     }
 
     if (isArchived === true) {
-        section = await executeWithRetry(() => client.archiveSection(id))
+        steps.push({
+            label: 'archive',
+            archiveChange: true,
+            run: () => client.archiveSection(id),
+        })
     }
 
-    // The schema refine guarantees at least one of the calls above ran.
-    return section as Section
+    let outcome: SectionOutcome | undefined
+    let applied: string | undefined
+
+    for (const step of steps) {
+        try {
+            const section = await executeWithRetry(step.run)
+            outcome = {
+                section,
+                archiveChange: step.archiveChange ?? outcome?.archiveChange,
+            }
+            applied = step.label
+        } catch (error) {
+            // The schema refine guarantees at least one step, so a first-step
+            // failure always rejects here.
+            if (!outcome || !applied) throw error
+            const capitalised = applied.charAt(0).toUpperCase() + applied.slice(1)
+            return {
+                ...outcome,
+                partial: {
+                    error: `${capitalised} applied; ${step.label} failed: ${formatBatchItemError(error)}`,
+                    ...getRateLimitDetails(error),
+                },
+            }
+        }
+    }
+
+    // The schema refine guarantees at least one step ran.
+    return outcome as SectionOutcome
 }
 
 const ARCHIVE_NOTE = { true: ' - archived', false: ' - unarchived' } as const
