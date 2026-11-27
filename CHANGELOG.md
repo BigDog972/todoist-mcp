@@ -1,3 +1,10 @@
+## [18.0.1](https://github.com/todoist/todoist-mcp/compare/v18.0.0...v18.0.1) (2026-11-27)
+
+### Bug Fixes
+
+* **reschedule-tasks:** keep a timed task's time and refresh its due string ([#777](https://github.com/todoist/todoist-mcp/issues/777)) ([88d0662](https://github.com/todoist/todoist-mcp/commit/88d0662f0dbc7bc6680ffc8f046e7cfdb5ff5f09)), closes [#776](https://github.com/todoist/todoist-mcp/issues/776)
+* **reschedule-tasks:** keep the local time of a fixed-timezone task ([#778](https://github.com/todoist/todoist-mcp/issues/778)) ([caeb503](https://github.com/todoist/todoist-mcp/commit/caeb5030d6ecab9afd6bbaa2886821f08a7e7e2b))
+
 ## [18.0.0](https://github.com/todoist/todoist-mcp/compare/v17.4.1...v18.0.0) (2026-11-26)
 
 ### ⚠ BREAKING CHANGES
