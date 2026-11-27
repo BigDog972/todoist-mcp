@@ -76,3 +76,26 @@ describe('productivity-analysis prompt', () => {
         }
     })
 })
+
+describe('server info', () => {
+    // The description tells the people using a client what the server is for, in a server list
+    // or a connector directory, before any tool is listed or called.
+    it('should describe what the server does', async () => {
+        const server = getMcpServer({ token: 'test-token' })
+        const client = new Client({ name: 'mcp-server-test', version: '1.0.0' })
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+        await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+        try {
+            expect(client.getServerVersion()).toEqual(
+                expect.objectContaining({
+                    name: 'todoist-mcp-server',
+                    description:
+                        'The official Todoist MCP server. Add, update, schedule, complete and search tasks, with priorities, due dates, deadlines, durations, labels and assignees. Organise projects, sections and folders, personal or in a workspace. Add, edit and read comments and view their attachments, and manage labels, saved filters, reminders and templates. Find collaborators, check or set your status, and review activity, project health and productivity stats.',
+                }),
+            )
+        } finally {
+            await client.close()
+            await server.close()
+        }
+    })
+})
