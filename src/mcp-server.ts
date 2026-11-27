@@ -14,27 +14,16 @@ import { TODOIST_MCP_VERSION, createTodoistClient } from './usage-tracking.js'
 import { ONE_HOUR_MS } from './utils/constants.js'
 
 export const instructions = `
-## Todoist Task and Project Management Tools
+## Todoist
 
-You have access to comprehensive Todoist management tools for personal productivity and team collaboration. Use these tools to help users manage tasks, projects, sections, comments, and assignments effectively.
-
-### Core Capabilities:
-- Create, update, complete, and search tasks with rich metadata (priorities, due dates, durations, assignments)
-- Manage projects and sections with flexible organization
-- Handle comments and collaboration features
-- Bulk assignment operations for team workflows
-- Get overviews and insights about workload and progress
-
-### Choosing between tools
-
-What each tool does and how to fill its parameters is in the tool's own description and input schema. This section covers only what those cannot: which tool to reach for, and how tools relate to each other.
+Manage Todoist: create, update, complete and search tasks (priorities, dates, durations, assignees, labels); organise projects, sections and folders, personal or in workspaces; comments and attachments, filters, reminders, templates, collaborators, user status, activity, overviews and productivity stats.
 
 **Dates**
 
 - To move a task to a different date or time use **reschedule-tasks**, never **update-tasks**. It also sets duration, for time-blocking. update-tasks replaces the whole due string, so it refuses a dueString on a recurring task unless replaceRecurrence is true.
 - Never send a task's existing projectId, sectionId or parentId back to **update-tasks** — those fields are treated as a move.
 - All dates respect the user's timezone.
-- Todoist apps only display task durations under 24 hours. A longer one ("36h") or a day-based one ("3d") is stored and reported faithfully, but the apps show the task as having no duration — only set one when the user explicitly asks for it.
+- Todoist apps show no duration of 24 hours or more ("36h", "3d"), though it is stored: only set one when the user explicitly asks for it.
 
 **Finding things**
 
@@ -66,11 +55,9 @@ What each tool does and how to fill its parameters is in the tool's own descript
 **Batches**
 
 - Prefer a batch tool over one call per item.
-- Where a batch tool returns per-item \`failures\` alongside successes, one failure does not undo the rest: never retry the whole batch, re-send only the items whose failure reason is fixable. **reschedule-tasks** is the exception — it has no per-item failures and throws if any task fails, so retry it as a whole.
+- Where a batch tool returns per-item \`failures\` alongside successes, one failure does not undo the rest: never retry the whole batch, re-send only the items whose failure reason is fixable.
 
 For a productivity review, call **get-productivity-stats**, then find what the user completed as described under "Finding things".
-
-Always provide clear, actionable task titles and descriptions. Use the overview tools to give users context about their workload and project status.
 `
 
 /**
