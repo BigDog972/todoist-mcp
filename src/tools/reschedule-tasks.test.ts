@@ -23,7 +23,7 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
     })
 
     describe('rescheduling non-recurring tasks', () => {
-        it('should reschedule a date-only task to a new date', async () => {
+        it('sends the new date without the old due string', async () => {
             const task = createMockTask({
                 id: 'task-1',
                 due: {
@@ -47,7 +47,6 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
                             id: 'task-1',
                             due: {
                                 date: '2026-03-20',
-                                string: 'Mar 15',
                                 isRecurring: false,
                             },
                         },
@@ -93,12 +92,42 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
     })
 
     describe('time preservation', () => {
-        it('should preserve existing time when input is date-only', async () => {
+        it('keeps the time that API v1 sends in due.date when input is date-only', async () => {
             const task = createMockTask({
                 id: 'task-1',
                 due: {
-                    date: '2026-03-15',
-                    datetime: '2026-03-15T10:00:00Z',
+                    date: '2026-12-10T15:00:00',
+                    string: 'Dec 10 2026 at 3pm',
+                    isRecurring: false,
+                },
+            })
+            mockTodoistApi.getTask.mockResolvedValue(task)
+
+            await rescheduleTasks.execute(
+                { tasks: [{ id: 'task-1', date: '2026-12-11' }] },
+                mockTodoistApi,
+            )
+
+            expect(mockTodoistApi.sync).toHaveBeenCalledWith({
+                commands: [
+                    expect.objectContaining({
+                        args: {
+                            id: 'task-1',
+                            due: {
+                                date: '2026-12-11T15:00:00',
+                                isRecurring: false,
+                            },
+                        },
+                    }),
+                ],
+            })
+        })
+
+        it('keeps the time and the rule of a recurring task when input is date-only', async () => {
+            const task = createMockTask({
+                id: 'task-1',
+                due: {
+                    date: '2026-03-15T10:00:00',
                     string: 'every day at 10am',
                     isRecurring: true,
                 },
@@ -113,11 +142,14 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
             expect(mockTodoistApi.sync).toHaveBeenCalledWith({
                 commands: [
                     expect.objectContaining({
-                        args: expect.objectContaining({
-                            due: expect.objectContaining({
-                                date: '2026-03-20T10:00:00Z',
-                            }),
-                        }),
+                        args: {
+                            id: 'task-1',
+                            due: {
+                                date: '2026-03-20T10:00:00',
+                                string: 'every day at 10am',
+                                isRecurring: true,
+                            },
+                        },
                     }),
                 ],
             })
@@ -127,8 +159,7 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
             const task = createMockTask({
                 id: 'task-1',
                 due: {
-                    date: '2026-03-15',
-                    datetime: '2026-03-15T10:00:00Z',
+                    date: '2026-03-15T10:00:00',
                     string: 'every day at 10am',
                     isRecurring: true,
                 },
@@ -159,8 +190,7 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
             const task = createMockTask({
                 id: 'task-1',
                 due: {
-                    date: '2026-03-15',
-                    datetime: '2026-03-15T10:00:00',
+                    date: '2026-03-15T14:00:00Z',
                     string: 'every day at 10am',
                     isRecurring: true,
                     timezone: 'America/New_York',
@@ -532,8 +562,7 @@ describe(`${RESCHEDULE_TASKS} tool`, () => {
             const task = createMockTask({
                 id: 'task-1',
                 due: {
-                    date: '2026-10-29',
-                    datetime: '2026-10-29T09:00:00',
+                    date: '2026-10-29T09:00:00',
                     string: 'every day at 9:00',
                     isRecurring: true,
                 },
@@ -587,20 +616,18 @@ describe('buildRescheduleDate', () => {
         expect(result).toBe('2026-03-20')
     })
 
-    it('should preserve time from existing datetime', () => {
+    it('should preserve time from the existing due date', () => {
         const result = buildRescheduleDate('2026-03-20', {
-            date: '2026-03-15',
-            datetime: '2026-03-15T10:30:00Z',
+            date: '2026-03-15T10:30:00',
             string: 'every day at 10:30am',
             isRecurring: true,
         })
-        expect(result).toBe('2026-03-20T10:30:00Z')
+        expect(result).toBe('2026-03-20T10:30:00')
     })
 
     it('should use explicit datetime as-is', () => {
         const result = buildRescheduleDate('2026-03-20T14:00:00', {
-            date: '2026-03-15',
-            datetime: '2026-03-15T10:30:00Z',
+            date: '2026-03-15T10:30:00',
             string: 'every day at 10:30am',
             isRecurring: true,
         })

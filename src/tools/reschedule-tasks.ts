@@ -159,7 +159,7 @@ function buildRescheduleFields(
         return {
             due: {
                 date: buildRescheduleDate(inputDate, task.due),
-                string: task.due.string,
+                ...(task.due.isRecurring && { string: task.due.string }),
                 isRecurring: task.due.isRecurring,
                 timezone: task.due.timezone ?? undefined,
                 lang: task.due.lang ?? undefined,
@@ -175,10 +175,10 @@ function buildRescheduleFields(
 
 function buildRescheduleDate(inputDate: string, existingDue: NonNullable<Task['due']>): string {
     const isInputDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(inputDate)
+    // Preserve existing time when only a new date is provided
+    const timePart = existingDue.date.substring(10)
 
-    if (isInputDateOnly && existingDue.datetime) {
-        // Preserve existing time when only a new date is provided
-        const timePart = existingDue.datetime.substring(10)
+    if (isInputDateOnly && timePart) {
         return inputDate + timePart
     }
 
